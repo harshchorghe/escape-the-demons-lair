@@ -1,200 +1,144 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { GameGameState, gameSync } from "@/lib/gameStore";
-import { pythonApi, Level2DoorData, FALLBACK_L2_DOORS } from "@/lib/pythonApi";
-import { DemonDoorCanvas } from "@/components/3d/DemonDoorCanvas";
 import { Level2LockedScreen } from "@/components/screens/Level2LockedScreen";
-import { KeyRound, ShieldAlert, CheckCircle, Unlock, AlertTriangle } from "lucide-react";
+import { CheckCircle, AlertCircle, DoorOpen } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface Level2ScreenProps {
   state: GameGameState;
   myRole: 'player1' | 'player2';
 }
 
+const DOORS = [
+  { id: 1, name: "Blood Moon Gate", emoji: "🩸", color: "from-red-900/40 to-red-950/60 border-red-700/50 hover:border-red-400 ring-red-500" },
+  { id: 2, name: "Soul Chains Gate", emoji: "⛓️", color: "from-purple-900/40 to-purple-950/60 border-purple-700/50 hover:border-purple-400 ring-purple-500" },
+  { id: 3, name: "Abyssal Portal",   emoji: "🌀", color: "from-blue-900/40 to-blue-950/60 border-blue-700/50 hover:border-blue-400 ring-blue-500" },
+];
+
 export const Level2Screen: React.FC<Level2ScreenProps> = ({ state }) => {
-  // Gate: show locked screen if Level 1 not yet completed
-  if (!state.l1IsCompleted) {
-    return <Level2LockedScreen state={state} />;
-  }
-
-  const [doors, setDoors] = useState<Level2DoorData[]>(FALLBACK_L2_DOORS);
-  const [selectedDoorId, setSelectedDoorId] = useState<number>(1);
-  const [cipherInput, setCipherInput] = useState<string>('');
+  const router = useRouter();
+  const [failedIds, setFailedIds] = useState<number[]>([]);
+  const [chosen, setChosen] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ success?: boolean; message: string }>({ message: '' });
+  const [locking, setLocking] = useState(false);
 
-  useEffect(() => {
-    const fetchDoors = async () => {
-      const data = await pythonApi.getLevel2Doors();
-      setDoors(data);
-    };
-    fetchDoors();
-  }, []);
+  if (!state.l1IsCompleted) return <Level2LockedScreen state={state} />;
 
-  const currentDoorData = doors.find((d) => d.doorId === selectedDoorId) || doors[0];
-  const isDoorUnlocked = state.l2UnlockedDoors.includes(selectedDoorId);
+  // Deterministic correct door from teamCode
+  const correctId = (() => {
+    if (!state.teamCode) return 2;
+    let s = 0;
+    for (let i = 0; i < state.teamCode.length; i++) s += state.teamCode.charCodeAt(i);
+    return (s % 3) + 1;
+  })();
 
-  const handleUnlockDoor = async () => {
-    if (!cipherInput.trim()) return;
-    setFeedback({ message: 'Decrypting ancient door runes...' });
+  const handlePickDoor = (id: number) => {
+    if (failedIds.includes(id) || locking || chosen !== null) return;
+    setChosen(id);
+    setLocking(true);
 
-    const result = await pythonApi.verifyAnswer(currentDoorData.puzzle.id, cipherInput);
-
-    if (result.success) {
-      setFeedback({ success: true, message: result.message });
-      const updatedUnlocked = Array.from(new Set([...state.l2UnlockedDoors, selectedDoorId]));
-
-      // If all 3 doors unlocked, proceed to Final Throne Room Level 3!
-      if (updatedUnlocked.length === 3) {
-        gameSync.updateState({
-          l2UnlockedDoors: updatedUnlocked,
-          currentLevel: 3,
-          timeRemaining: 300, // 5 mins for Final Level
-        });
-      } else {
-        gameSync.updateState({ l2UnlockedDoors: updatedUnlocked });
-        if (selectedDoorId < 3) {
-          setSelectedDoorId(selectedDoorId + 1);
-          setCipherInput('');
-        }
-      }
+    if (id === correctId) {
+      setFeedback({ success: true, message: "🎉 Correct door! Portal to the Throne Room opened!" });
+      gameSync.updateState({ l2UnlockedDoors: [id], currentLevel: 3, timeRemaining: 240 });
+      setTimeout(() => router.push('/level3'), 800);
     } else {
-      // Time penalty for incorrect door decoding!
-      setFeedback({ success: false, message: `${result.message} (-15 sec Penalty Applied)` });
+      setFeedback({ success: false, message: `💀 Demonic Trap! −30 seconds penalty!` });
+      setFailedIds((prev) => [...prev, id]);
       gameSync.updateState((prev) => ({
         ...prev,
-        timeRemaining: Math.max(1, prev.timeRemaining - 15),
-        timePenalties: prev.timePenalties + 15,
+        timeRemaining: Math.max(0, prev.timeRemaining - 30),
+        timePenalties: prev.timePenalties + 30,
+        gameStatus: Math.max(0, prev.timeRemaining - 30) <= 0 ? 'disqualified' : prev.gameStatus,
       }));
+      setTimeout(() => { setChosen(null); setLocking(false); setFeedback({ message: '' }); }, 1500);
     }
   };
 
-  return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-6 space-y-6">
-      {/* Level Header */}
-      <div className="bg-zinc-950/90 border border-purple-900/60 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
-        <div>
-          <h2 className="text-xl font-bold font-serif text-purple-400 flex items-center gap-2">
-            <KeyRound className="w-5 h-5 text-purple-500 animate-pulse" />
-            Level 2: The 3 Demon Doors
-          </h2>
-          <p className="text-xs text-zinc-400">
-            Player 2 must decode ciphers for 3 Demon Doors within 3 minutes. Wrong attempts cost -15 seconds!
-          </p>
-        </div>
+  const remaining = DOORS.filter((d) => !failedIds.includes(d.id));
+  const isSuccess = chosen !== null && chosen === correctId;
 
-        {/* Door Selector Tabs */}
-        <div className="flex items-center gap-2">
-          {[1, 2, 3].map((dId) => {
-            const unlocked = state.l2UnlockedDoors.includes(dId);
-            const active = selectedDoorId === dId;
-            return (
-              <button
-                key={dId}
-                onClick={() => {
-                  setSelectedDoorId(dId);
-                  setCipherInput('');
-                  setFeedback({ message: '' });
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
-                  active
-                    ? 'bg-purple-700 text-white border border-purple-500 shadow-md'
-                    : unlocked
-                    ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-600/50'
-                    : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800'
-                }`}
-              >
-                {unlocked ? <CheckCircle className="w-3.5 h-3.5" /> : null}
-                Door {dId} {doors[dId - 1]?.symbol || ''}
-              </button>
-            );
-          })}
-        </div>
+  return (
+    <div className="w-full max-w-xl mx-auto px-4 py-8 space-y-8">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <p className="text-xs font-mono tracking-widest text-purple-400 uppercase">Level 2 · Demon Doors</p>
+        <h2 className="text-3xl font-extrabold text-white font-serif">Choose the Escape Door</h2>
+        <p className="text-sm text-zinc-400">
+          One door leads to the Throne Room. Wrong doors deal a <strong className="text-red-400">−30s penalty</strong>.
+        </p>
       </div>
 
-      {/* 3D Demon Door Scene */}
-      <DemonDoorCanvas
-        selectedDoorId={selectedDoorId}
-        unlockedDoors={state.l2UnlockedDoors}
-        onDoorClick={(id) => setSelectedDoorId(id)}
-      />
-
-      {/* Active Door Challenge Panel */}
-      <div className="bg-zinc-950/90 border border-purple-900/50 rounded-2xl p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <div>
-            <span className="text-xs font-mono text-purple-400 uppercase tracking-widest">
-              Demon Door {currentDoorData.doorId} of 3
-            </span>
-            <h3 className="text-2xl font-bold text-white font-serif flex items-center gap-2">
-              <span>{currentDoorData.symbol}</span>
-              <span>{currentDoorData.name}</span>
-            </h3>
-          </div>
-          <span className="text-xs font-mono bg-purple-950/60 border border-purple-700/40 text-purple-300 px-3 py-1 rounded-full">
-            Cipher Code Length: {currentDoorData.codeLength}
+      {/* Penalty counter */}
+      {failedIds.length > 0 && (
+        <div className="flex justify-center">
+          <span className="inline-flex items-center gap-2 text-xs font-mono font-bold bg-red-950/60 border border-red-700/40 text-red-400 px-4 py-2 rounded-full">
+            <AlertCircle className="w-3.5 h-3.5" />
+            {failedIds.length} trap{failedIds.length > 1 ? 's' : ''} hit · −{failedIds.length * 30}s total
           </span>
         </div>
+      )}
 
-        {/* Cipher Box */}
-        <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 space-y-3">
-          <div className="text-purple-300 font-mono text-sm font-semibold flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-purple-400" />
-            {currentDoorData.puzzle.title}
-          </div>
-          <p className="text-xs text-zinc-300 font-mono leading-normal">
-            {currentDoorData.puzzle.description}
-          </p>
+      {/* Feedback */}
+      {feedback.message && (
+        <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-mono transition-all ${
+          feedback.success
+            ? 'bg-emerald-950/60 border-emerald-600/40 text-emerald-300'
+            : 'bg-red-950/60 border-red-700/40 text-red-300'
+        }`}>
+          {feedback.success
+            ? <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+            : <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />}
+          {feedback.message}
+        </div>
+      )}
 
-          <div className="pt-2">
-            <label className="block text-xs font-mono text-zinc-400 uppercase mb-1">
-              Enter Decoded Cipher Sequence
-            </label>
-            <input
-              type="text"
-              value={cipherInput}
-              onChange={(e) => setCipherInput(e.target.value.toUpperCase())}
-              placeholder="e.g. 101010 or ABJLI"
-              disabled={isDoorUnlocked}
-              className="w-full bg-zinc-950 border border-zinc-800 focus:border-purple-500 text-purple-200 font-mono text-base tracking-wider px-3 py-2.5 rounded-lg outline-none uppercase"
-            />
-          </div>
+      {/* Door cards */}
+      <div className="grid grid-cols-1 gap-4">
+        {DOORS.map((door) => {
+          const isFailed = failedIds.includes(door.id);
+          const isChosen = chosen === door.id;
+          const isWinner = isSuccess && isChosen;
 
-          {currentDoorData.puzzle.hint && (
-            <div className="text-xs font-mono text-amber-300/90 bg-amber-950/20 border border-amber-900/30 p-2.5 rounded-lg">
-              💡 Cipher Hint: {currentDoorData.puzzle.hint}
-            </div>
-          )}
-
-          {feedback.message && (
-            <div
-              className={`p-3 rounded-lg text-xs font-mono border flex items-center gap-2 ${
-                feedback.success
-                  ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-300'
-                  : 'bg-red-950/50 border-red-500/50 text-red-300 animate-bounce'
+          return (
+            <button
+              key={door.id}
+              onClick={() => handlePickDoor(door.id)}
+              disabled={isFailed || locking}
+              className={`w-full text-left rounded-2xl border bg-gradient-to-br p-5 transition-all duration-300 group ${door.color} ${
+                isFailed
+                  ? 'opacity-40 cursor-default border-zinc-700/30 from-zinc-950 to-zinc-950'
+                  : isWinner
+                  ? 'border-emerald-500 from-emerald-950/60 to-emerald-950/30 ring-2 ring-emerald-500/30'
+                  : isChosen && !isFailed
+                  ? 'opacity-70 cursor-wait'
+                  : 'cursor-pointer hover:scale-[1.01] active:scale-[0.99]'
               }`}
             >
-              {feedback.success ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-              <span>{feedback.message}</span>
-            </div>
-          )}
-
-          <div className="pt-2">
-            {!isDoorUnlocked ? (
-              <button
-                onClick={handleUnlockDoor}
-                className="w-full bg-purple-700 hover:bg-purple-600 text-white font-mono text-sm py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-950/50 flex items-center justify-center gap-2"
-              >
-                <Unlock className="w-4 h-4" /> Break Demon Seal & Open Door
-              </button>
-            ) : (
-              <div className="p-3 bg-emerald-950/50 border border-emerald-600/50 rounded-xl text-center text-xs font-mono text-emerald-300 flex items-center justify-center gap-2">
-                <CheckCircle className="w-4 h-4" /> Door {selectedDoorId} Unlocked & Passed!
+              <div className="flex items-center gap-4">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 transition-all ${
+                  isFailed ? 'bg-zinc-900/40 grayscale' : 'bg-black/30 group-hover:scale-110'
+                }`}>
+                  {isWinner ? '✅' : isFailed ? '💥' : door.emoji}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-0.5">Door {door.id}</p>
+                  <h3 className="text-lg font-bold text-white">{door.name}</h3>
+                  {isFailed && <p className="text-xs text-red-400 font-mono mt-0.5">Demonic Trap — Avoid!</p>}
+                </div>
+                {!isFailed && !locking && (
+                  <DoorOpen className="w-5 h-5 text-zinc-500 group-hover:text-white transition-colors shrink-0" />
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </button>
+          );
+        })}
       </div>
+
+      <p className="text-center text-xs text-zinc-600 font-mono">
+        {remaining.length} door{remaining.length !== 1 ? 's' : ''} remaining · Be bold, Decrypter!
+      </p>
     </div>
   );
 };

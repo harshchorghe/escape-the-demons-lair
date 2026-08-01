@@ -19,6 +19,7 @@ export interface GameGameState {
   isPlayer2Ready: boolean;
   currentLevel: 1 | 2 | 3 | 4; // 1: Haunted Rooms, 2: Demon Doors, 3: Throne Room, 4: Victory
   l1CompletedRooms: number[];
+  l1FailedRooms: number[];
   l1IsCompleted: boolean;
   l2UnlockedDoors: number[];
   l3DestroyedCrystals: number[];
@@ -28,7 +29,8 @@ export interface GameGameState {
   timeRemaining: number;
   totalTimeElapsed: number;
   timePenalties: number;
-  gameStatus: 'lobby' | 'playing' | 'gameover' | 'victory';
+  l3TimeElapsed: number; // Level 3 only timer for leaderboard ranking
+  gameStatus: 'lobby' | 'playing' | 'gameover' | 'victory' | 'disqualified';
   lastUpdated: number;
 }
 
@@ -41,15 +43,17 @@ export const INITIAL_GAME_STATE: GameGameState = {
   isPlayer2Ready: false,
   currentLevel: 1,
   l1CompletedRooms: [],
+  l1FailedRooms: [],
   l1IsCompleted: false,
   l2UnlockedDoors: [],
   l3DestroyedCrystals: [],
   collectedSealFragments: 0,
   selectedSeal: null,
   isDemonSealed: false,
-  timeRemaining: 120, // 2 mins for Level 1
+  timeRemaining: 120, // Level 1 timer: 2 minutes (120s)
   totalTimeElapsed: 0,
   timePenalties: 0,
+  l3TimeElapsed: 0,
   gameStatus: 'lobby',
   lastUpdated: Date.now(),
 };
@@ -62,11 +66,7 @@ export const ANCIENT_SEALS = [
   { id: 'ABYSSAL', name: 'Seal of Abyssal Chains', description: 'Attempts to shackle the Demon in dark chains.', isCorrect: false },
 ];
 
-export const MOCK_LEADERBOARD: LeaderboardEntry[] = [
-  { id: '1', teamCode: 'LAIR-99', player1: 'Viper', player2: 'Shadow', totalTimeSeconds: 245, date: '2026-08-01' },
-  { id: '2', teamCode: 'HELL-07', player1: 'Aether', player2: 'Phoenix', totalTimeSeconds: 312, date: '2026-08-01' },
-  { id: '3', teamCode: 'RUNE-42', player1: 'Cipher', player2: 'Matrix', totalTimeSeconds: 388, date: '2026-08-01' },
-];
+
 
 class GameSyncManager {
   private channel: BroadcastChannel | null = null;
@@ -77,17 +77,41 @@ class GameSyncManager {
 
   constructor() {
     if (typeof window !== 'undefined') {
+      // Rehydrate from sessionStorage if available
+      try {
+        const saved = sessionStorage.getItem('demons_lair_state');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.teamCode) {
+            this.currentState = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to rehydrate session state:', e);
+      }
+
       try {
         this.channel = new BroadcastChannel('escape_demons_lair_sync');
         this.channel.onmessage = (event) => {
           if (event.data && event.data.type === 'STATE_UPDATE') {
             this.currentState = event.data.state;
+            this.saveToSession(this.currentState);
             this.syncFirebaseSubscription(this.currentState.teamCode);
             this.notifyListeners();
           }
         };
       } catch (e) {
         console.warn('BroadcastChannel error:', e);
+      }
+    }
+  }
+
+  private saveToSession(state: GameGameState) {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('demons_lair_state', JSON.stringify(state));
+      } catch (e) {
+        // ignore
       }
     }
   }
@@ -108,6 +132,7 @@ class GameSyncManager {
         if (snapshot.exists()) {
           const data = snapshot.data() as GameGameState;
           this.currentState = data;
+          this.saveToSession(data);
           this.notifyListeners();
         }
       });
@@ -137,10 +162,12 @@ class GameSyncManager {
     return this.currentState;
   }
 
-  public updateState(updater: Partial<GameGameState> | ((prev: GameGameState) => GameGameState)) {
-    const newState = typeof updater === 'function' ? updater(this.currentState) : { ...this.currentState, ...updater };
-    newState.lastUpdated = Date.now();
+  public updateState(updater: Partial<GameGameState> | ((prev: GameGameState) => Partial<GameGameState>)) {
+    const partialUpdate = typeof updater === 'function' ? updater(this.currentState) : updater;
+    const newState = { ...this.currentState, ...partialUpdate, lastUpdated: Date.now() };
+    
     this.currentState = newState;
+    this.saveToSession(newState);
 
     if (newState.teamCode) {
       this.syncFirebaseSubscription(newState.teamCode);
@@ -154,7 +181,9 @@ class GameSyncManager {
     // Broadcast to Firebase if available
     if (isFirebaseInitialized && db && newState.teamCode) {
       try {
-        setDoc(doc(db, 'rooms', newState.teamCode), newState, { merge: true });
+        // Only send the fields that actually changed (plus lastUpdated) to prevent race conditions!
+        const firestorePayload = { ...partialUpdate, lastUpdated: newState.lastUpdated };
+        setDoc(doc(db, 'rooms', newState.teamCode), firestorePayload, { merge: true });
       } catch (e) {
         console.warn("Firebase sync update error:", e);
       }

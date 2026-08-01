@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { GameGameState, gameSync } from "@/lib/gameStore";
-import { Users, Key, Play, ShieldAlert, CheckCircle2, Copy, Check, ArrowRight, ShieldCheck } from "lucide-react";
+import { LeaderboardModal } from "@/components/ui/LeaderboardModal";
+import { Users, Key, Play, ShieldAlert, CheckCircle2, Copy, Check, ArrowRight, ShieldCheck, Trophy } from "lucide-react";
 
 interface LobbyScreenProps {
   state: GameGameState;
@@ -17,6 +18,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   setMyRole,
   onStartMission,
 }) => {
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [player1Input, setPlayer1Input] = useState(state.player1Name || '');
   const [teamNameInput, setTeamNameInput] = useState(state.teamName || '');
   const [player2Input, setPlayer2Input] = useState(state.player2Name || '');
@@ -118,7 +120,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     }
     gameSync.updateState({
       currentLevel: 1,
-      timeRemaining: 120, // 2 mins Level 1
+      timeRemaining: 120, // 2 minutes (120s) for Level 1
+      totalTimeElapsed: 0,
+      timePenalties: 0,
+      l1CompletedRooms: [],
+      l1FailedRooms: [],
+      l1IsCompleted: false,
+      l2UnlockedDoors: [],
+      l3DestroyedCrystals: [],
+      collectedSealFragments: 0,
+      selectedSeal: null,
+      isDemonSealed: false,
       gameStatus: 'playing',
     });
     if (onStartMission) onStartMission();
@@ -142,9 +154,16 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-2 font-serif drop-shadow-md">
           Escape the Demon's Lair
         </h1>
-        <p className="text-sm text-zinc-400 max-w-xl mx-auto">
+        <p className="text-sm text-zinc-400 max-w-xl mx-auto mb-4">
           Form a 2-player team, solve haunted rooms, decode demon door ciphers, and unite in the Throne Room to seal the Demon Lord.
         </p>
+        <button
+          onClick={() => setIsLeaderboardOpen(true)}
+          className="inline-flex items-center gap-2 bg-amber-950/60 border border-amber-500/50 hover:bg-amber-900/60 text-amber-300 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-lg shadow-amber-950/40"
+        >
+          <Trophy className="w-4 h-4 text-amber-400" />
+          🏆 View Hall of Fame Leaderboard
+        </button>
       </div>
 
       {!state.teamCode ? (
@@ -390,6 +409,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </div>
         </div>
       )}
+
+      {/* Leaderboard Modal */}
+      <LeaderboardModal
+        isOpen={isLeaderboardOpen}
+        onClose={() => setIsLeaderboardOpen(false)}
+        currentTeamCode={state.teamCode}
+      />
     </div>
   );
 };

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { GameGameState, gameSync, MOCK_LEADERBOARD, LeaderboardEntry } from "@/lib/gameStore";
+import { GameGameState, gameSync } from "@/lib/gameStore";
+import { saveTeamScore, getAllTeamsLeaderboard, LeaderboardEntry } from "@/lib/leaderboardService";
 import confetti from "canvas-confetti";
 import { Trophy, Clock, ShieldCheck, RotateCcw, Award } from "lucide-react";
 
@@ -10,7 +11,7 @@ interface VictoryScreenProps {
 }
 
 export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   useEffect(() => {
     // Trigger victory confetti burst!
@@ -25,21 +26,28 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
       // Confetti fallback
     }
 
-    // Add current run to leaderboard
-    const newEntry: LeaderboardEntry = {
-      id: Date.now().toString(),
-      teamCode: state.teamCode || 'LAIR-XX',
-      player1: state.player1Name || 'Player 1',
-      player2: state.player2Name || 'Player 2',
-      totalTimeSeconds: state.totalTimeElapsed + state.timePenalties,
-      date: new Date().toISOString().split('T')[0],
+    const recordScoreAndFetch = async () => {
+      const finalTime = state.l3TimeElapsed || 0; // Rank based on Level 3 only
+
+      // Save score to Firestore & Local storage with 3 levels completed!
+      await saveTeamScore({
+        teamCode: state.teamCode || 'LAIR-XX',
+        teamName: state.teamName || 'Demon Slayers',
+        player1: state.player1Name || 'Player 1',
+        player2: state.player2Name || 'Player 2',
+        levelsCompleted: 3,
+        totalTimeSeconds: finalTime,
+        gameStatus: 'victory',
+        date: new Date().toISOString().split('T')[0],
+      });
+
+      // Fetch updated ranked leaderboard
+      const topData = await getAllTeamsLeaderboard(15);
+      setLeaderboard(topData);
     };
 
-    setLeaderboard((prev) => {
-      const updated = [...prev, newEntry].sort((a, b) => a.totalTimeSeconds - b.totalTimeSeconds);
-      return updated.slice(0, 10);
-    });
-  }, [state.teamCode, state.player1Name, state.player2Name, state.totalTimeElapsed, state.timePenalties]);
+    recordScoreAndFetch();
+  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.l3TimeElapsed]);
 
   const formatSeconds = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -58,6 +66,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
       collectedSealFragments: 0,
       selectedSeal: null,
       isDemonSealed: false,
+      l3TimeElapsed: 0,
       totalTimeElapsed: 0,
       timePenalties: 0,
     });
@@ -93,24 +102,10 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
             <span className="text-lg font-mono font-bold text-white">{state.teamCode}</span>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-            <span className="text-xs font-mono text-zinc-400 uppercase block">Total Elapsed Time</span>
+          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl col-span-2">
+            <span className="text-xs font-mono text-zinc-400 uppercase block">Level 3 Completion Time (Rank Score)</span>
             <span className="text-lg font-mono font-bold text-emerald-400">
-              {formatSeconds(state.totalTimeElapsed)}
-            </span>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-            <span className="text-xs font-mono text-zinc-400 uppercase block">Time Penalties</span>
-            <span className="text-lg font-mono font-bold text-red-400">
-              +{state.timePenalties}s
-            </span>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-            <span className="text-xs font-mono text-zinc-400 uppercase block">Final Ranking Time</span>
-            <span className="text-lg font-mono font-bold text-amber-400">
-              {formatSeconds(state.totalTimeElapsed + state.timePenalties)}
+              {formatSeconds(state.l3TimeElapsed || 0)}
             </span>
           </div>
         </div>

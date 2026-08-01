@@ -10,8 +10,8 @@ interface Level2LockedScreenProps {
 
 export const Level2LockedScreen: React.FC<Level2LockedScreenProps> = ({ state }) => {
   const completed = state.l1CompletedRooms.length;
-  const total = 3;
-  const pct = Math.round((completed / total) * 100);
+  const total = 2;
+  const pct = Math.min(100, Math.round((completed / total) * 100));
 
   return (
     <div className="w-full max-w-xl mx-auto flex flex-col items-center justify-center min-h-[60vh] px-4">
@@ -37,7 +37,7 @@ export const Level2LockedScreen: React.FC<Level2LockedScreenProps> = ({ state })
         <p className="text-sm text-zinc-400 max-w-sm mx-auto leading-relaxed">
           The Demon Doors are sealed until{" "}
           <span className="text-red-400 font-semibold">{state.player1Name || "Player 1"}</span>{" "}
-          clears all Haunted Rooms in Level 1.
+          clears 2 Haunted Rooms in Level 1.
         </p>
       </div>
 

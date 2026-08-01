@@ -35,21 +35,21 @@ export interface FinalCrystalData {
 export const FALLBACK_L1_ROOMS: Level1RoomData[] = [
   {
     roomId: 1,
-    name: "Room of Whispering Shadows",
-    description: "An ancient spectral scroll floats before you, written in pythonic runes.",
+    name: "Room 1: Cursed Logic Puzzle",
+    description: "An ancient spectral altar presents a logic sequence test. Solve the pattern to unlock the altar energy.",
     puzzle: {
       id: "l1_p1",
-      title: "Spectral Array Reverse",
-      description: "Complete the Python function to reverse the array of cursed runes without using array[::-1].",
-      type: "code",
-      initialCode: "def uncurse_runes(runes):\n    # Return array in reverse order\n    result = []\n    for i in range(len(runes) - 1, -1, -1):\n        result.append(runes[i])\n    return result",
-      targetAnswer: "result",
-      hint: "Use a loop counting downwards or append elements from the end."
+      title: "Rune Sequence Logic",
+      description: "If 2 -> 4, 3 -> 9, 4 -> 16, what number completes 5 -> ?",
+      type: "puzzle",
+      targetAnswer: "25",
+      options: ["20", "25", "30", "125"],
+      hint: "Each number is squared (n * n)."
     }
   },
   {
     roomId: 2,
-    name: "Chamber of Forgotten Ciphers",
+    name: "Room 2: Spectral Riddle",
     description: "Carved into the obsidian wall is a riddle that guards the door mechanism.",
     puzzle: {
       id: "l1_p2",
@@ -63,8 +63,8 @@ export const FALLBACK_L1_ROOMS: Level1RoomData[] = [
   },
   {
     roomId: 3,
-    name: "Sanctum of the Teleportation Altar",
-    description: "The altar requires the correct prime rune sequence to open the portal to Level 2.",
+    name: "Room 3: Python Altar Code",
+    description: "The altar requires the correct prime rune sequence written in Python to open the portal.",
     puzzle: {
       id: "l1_p3",
       title: "Prime Rune Calculator",
