@@ -1,65 +1,108 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { GameGameState, INITIAL_GAME_STATE, gameSync } from "@/lib/gameStore";
+import { HeaderHUD } from "@/components/ui/HeaderHUD";
+import { PythonConfigModal } from "@/components/ui/PythonConfigModal";
+import { LobbyScreen } from "@/components/screens/LobbyScreen";
+import { VictoryScreen } from "@/components/screens/VictoryScreen";
+import { ShieldAlert, Skull } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+  const [gameState, setGameState] = useState<GameGameState>(INITIAL_GAME_STATE);
+  const [myRole, setMyRole] = useState<'player1' | 'player2'>('player1');
+  const [isPythonConfigOpen, setIsPythonConfigOpen] = useState<boolean>(false);
+
+  // Subscribe to real-time game state updates (cross-tab & Firebase)
+  useEffect(() => {
+    const unsubscribe = gameSync.subscribe((state) => {
+      setGameState(state);
+      // Auto-redirect both players when game launches
+      if (state.gameStatus === 'playing') {
+        const storedRole = typeof window !== 'undefined'
+          ? window.sessionStorage.getItem('my_role') as 'player1' | 'player2' | null
+          : null;
+        const role = storedRole || myRole;
+        router.push(role === 'player1' ? '/level1' : '/level2');
+      }
+    });
+    return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myRole]);
+
+  const handleSetMyRole = (role: 'player1' | 'player2') => {
+    setMyRole(role);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('my_role', role);
+    }
+  };
+
+  const handleStartMission = () => {
+    const role = typeof window !== 'undefined'
+      ? window.sessionStorage.getItem('my_role') as 'player1' | 'player2' | null
+      : null;
+    router.push((role || myRole) === 'player1' ? '/level1' : '/level2');
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-red-900 selection:text-white font-sans">
+      {/* Header HUD Bar */}
+      <HeaderHUD
+        teamCode={gameState.teamCode}
+        myRole={myRole}
+        currentLevel={gameState.currentLevel}
+        timeRemaining={gameState.timeRemaining}
+        totalTimeElapsed={gameState.totalTimeElapsed}
+        timePenalties={gameState.timePenalties}
+        onOpenPythonConfig={() => setIsPythonConfigOpen(true)}
+      />
+
+      {/* Main Content Area - only lobby shown here; levels have dedicated routes */}
+      <main className="flex-1 flex flex-col items-center justify-center p-4">
+        {/* Lobby Screen */}
+        {gameState.gameStatus === 'lobby' && (
+          <LobbyScreen
+            state={gameState}
+            myRole={myRole}
+            setMyRole={handleSetMyRole}
+            onStartMission={handleStartMission}
+          />
+        )}
+
+        {/* Victory Screen (if navigated back) */}
+        {(gameState.gameStatus === 'victory' || gameState.currentLevel === 4) && (
+          <VictoryScreen state={gameState} />
+        )}
+
+        {/* Redirect hint when playing */}
+        {gameState.gameStatus === 'playing' && (
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-full bg-red-950/60 border border-red-700/40 flex items-center justify-center mx-auto mb-4">
+              <Skull className="w-6 h-6 text-red-500 animate-pulse" />
+            </div>
+            <p className="text-zinc-400 text-sm font-mono">Redirecting to your level...</p>
+          </div>
+        )}
       </main>
+
+      {/* Footer */}
+      <footer className="w-full border-t border-zinc-900 bg-zinc-950 px-4 py-3 text-center text-xs font-mono text-zinc-600">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>Escape the Demon's Lair • Next.js + Three.js + Firebase + Python Backend</span>
+          <span className="flex items-center gap-1 text-zinc-500">
+            <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
+            Co-op Mission Rule Engine Active
+          </span>
+        </div>
+      </footer>
+
+      {/* Python Config Modal */}
+      <PythonConfigModal
+        isOpen={isPythonConfigOpen}
+        onClose={() => setIsPythonConfigOpen(false)}
+      />
     </div>
   );
 }
