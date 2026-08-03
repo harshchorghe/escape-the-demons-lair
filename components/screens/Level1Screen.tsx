@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { GameGameState, gameSync } from "@/lib/gameStore";
 import { pythonApi, Level1RoomData, FALLBACK_L1_ROOMS } from "@/lib/pythonApi";
+import { puzzleService } from "@/lib/puzzleService";
 import { CheckCircle, Timer, AlertCircle, ArrowRight, RotateCcw, HelpCircle } from "lucide-react";
 
 interface Level1ScreenProps {
@@ -28,8 +29,12 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    pythonApi.getLevel1Rooms().then(setRooms);
-  }, []);
+    puzzleService.getAssignedSetForTeam(1, state.teamCode).then((assignedRooms) => {
+      if (Array.isArray(assignedRooms) && assignedRooms.length > 0) {
+        setRooms(assignedRooms);
+      }
+    });
+  }, [state.teamCode]);
 
   // 60s room countdown
   useEffect(() => {

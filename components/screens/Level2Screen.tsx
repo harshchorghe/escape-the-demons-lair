@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GameGameState, gameSync } from "@/lib/gameStore";
-import { pythonApi } from "@/lib/pythonApi";
+import { pythonApi, Level2DoorData, FALLBACK_L2_DOORS } from "@/lib/pythonApi";
+import { puzzleService } from "@/lib/puzzleService";
 import { Level2LockedScreen } from "@/components/screens/Level2LockedScreen";
 import { CheckCircle, AlertCircle, DoorOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -20,10 +21,19 @@ const DOORS = [
 
 export const Level2Screen: React.FC<Level2ScreenProps> = ({ state }) => {
   const router = useRouter();
+  const [doorData, setDoorData] = useState<Level2DoorData[]>(FALLBACK_L2_DOORS);
   const [failedIds, setFailedIds] = useState<number[]>([]);
   const [chosen, setChosen] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ success?: boolean; message: string }>({ message: '' });
   const [locking, setLocking] = useState(false);
+
+  useEffect(() => {
+    puzzleService.getAssignedSetForTeam(2, state.teamCode).then((assignedDoors) => {
+      if (Array.isArray(assignedDoors) && assignedDoors.length > 0) {
+        setDoorData(assignedDoors);
+      }
+    });
+  }, [state.teamCode]);
 
   if (!state.l1IsCompleted) return <Level2LockedScreen state={state} />;
 
