@@ -215,6 +215,52 @@ export class PythonApiService {
     }
   }
 
+  public async getTimerConfig(): Promise<{ level1Seconds?: number; level2Seconds?: number; level3Seconds?: number } | null> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/timer/config`, { signal: AbortSignal.timeout(500) });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Python API is offline
+    }
+    return null;
+  }
+
+  public async startRoomTimer(teamCode: string, level: number): Promise<any> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/timer/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamCode, level }),
+        signal: AbortSignal.timeout(500)
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Fallback
+    }
+    return null;
+  }
+
+  public async syncRoomTimer(teamCode: string, penalties: number = 0): Promise<{ timeRemaining?: number; totalTimeElapsed?: number } | null> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/timer/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamCode, penalties }),
+        signal: AbortSignal.timeout(500)
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Fallback
+    }
+    return null;
+  }
+
   public async getLevel1Rooms(): Promise<Level1RoomData[]> {
     try {
       const res = await fetch(`${this.baseUrl}/api/puzzles/level1`, { signal: AbortSignal.timeout(500) });
@@ -273,25 +319,34 @@ export class PythonApiService {
 
     // Check L1
     for (const room of FALLBACK_L1_ROOMS) {
-      if (room.puzzle.id === puzzleId) {
-        const correct = cleanUser === room.puzzle.targetAnswer.toUpperCase() || cleanUser.includes(room.puzzle.targetAnswer.toUpperCase());
-        return { success: correct, message: correct ? "Access Granted! Teleportation node illuminated." : "Incorrect rune code. Try again." };
+      const target = room.puzzle.targetAnswer.toUpperCase();
+      if (room.puzzle.id === puzzleId || cleanUser === target || cleanUser.includes(target)) {
+        const correct = cleanUser === target || cleanUser.includes(target);
+        if (correct || room.puzzle.id === puzzleId) {
+          return { success: correct, message: correct ? "Access Granted! Teleportation node illuminated." : "Incorrect rune code. Try again." };
+        }
       }
     }
 
     // Check L2
     for (const door of FALLBACK_L2_DOORS) {
-      if (door.puzzle.id === puzzleId) {
-        const correct = cleanUser === door.puzzle.targetAnswer.toUpperCase();
-        return { success: correct, message: correct ? "Demon Door Seal Unlocked!" : "Incorrect cipher key! Demon trap triggered (-15s)." };
+      const target = door.puzzle.targetAnswer.toUpperCase();
+      if (door.puzzle.id === puzzleId || cleanUser === target) {
+        const correct = cleanUser === target;
+        if (correct || door.puzzle.id === puzzleId) {
+          return { success: correct, message: correct ? "Demon Door Seal Unlocked!" : "Incorrect cipher key! Demon trap triggered (-15s)." };
+        }
       }
     }
 
     // Check Final
     for (const crystal of FALLBACK_FINAL_CRYSTALS) {
-      if (crystal.puzzle.id === puzzleId) {
-        const correct = cleanUser === crystal.puzzle.targetAnswer.toUpperCase();
-        return { success: correct, message: correct ? "Demon Crystal Shattered!" : "Incompatible element resonance. Try again." };
+      const target = crystal.puzzle.targetAnswer.toUpperCase();
+      if (crystal.puzzle.id === puzzleId || cleanUser === target) {
+        const correct = cleanUser === target;
+        if (correct || crystal.puzzle.id === puzzleId) {
+          return { success: correct, message: correct ? "Demon Crystal Shattered!" : "Incompatible element resonance. Try again." };
+        }
       }
     }
 

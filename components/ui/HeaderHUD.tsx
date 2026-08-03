@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Timer, Shield, Users, Server, Trophy } from "lucide-react";
+import { Timer, Shield, Users, Server, Trophy, Clock } from "lucide-react";
 import { pythonApi } from "@/lib/pythonApi";
 import { LeaderboardModal } from "./LeaderboardModal";
 
@@ -10,6 +10,7 @@ interface HeaderHUDProps {
   myRole: 'player1' | 'player2';
   currentLevel: 1 | 2 | 3 | 4;
   timeRemaining: number;
+  totalTimeElapsed?: number;
   onOpenPythonConfig: () => void;
 }
 
@@ -18,6 +19,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   myRole,
   currentLevel,
   timeRemaining,
+  totalTimeElapsed = 0,
   onOpenPythonConfig,
 }) => {
   const [pythonStatus, setPythonStatus] = useState<'online' | 'offline'>('offline');
@@ -76,14 +78,28 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
           </div>
 
           {/* Right: Timers, Leaderboard & Python Badge */}
-          <div className="flex items-center gap-3">
-            {/* Level Timer — only show during active gameplay */}
+          <div className="flex items-center gap-2.5">
+            {/* Level Countdown Timer & Total Time Taken */}
             {currentLevel !== 4 && (
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono text-xs border ${
-                timeRemaining < 30 ? 'bg-red-950/90 border-red-600 text-red-400 animate-bounce' : 'bg-zinc-900 border-zinc-800 text-amber-400'
-              }`}>
-                <Timer className="w-3.5 h-3.5" />
-                <span className="font-bold">{formatSeconds(timeRemaining)}</span>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs border ${
+                    timeRemaining < 30 ? 'bg-red-950/90 border-red-600 text-red-400 animate-bounce' : 'bg-zinc-900 border-zinc-800 text-amber-400'
+                  }`}
+                  title="Level Countdown Timer"
+                >
+                  <Timer className="w-3.5 h-3.5" />
+                  <span className="font-bold">{formatSeconds(timeRemaining)}</span>
+                </div>
+
+                <div
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs border bg-cyan-950/40 border-cyan-800/60 text-cyan-300 shadow-sm"
+                  title="Total Time Taken by Team Across All Levels"
+                >
+                  <Clock className="w-3.5 h-3.5 text-cyan-400 animate-spin" style={{ animationDuration: '6s' }} />
+                  <span className="font-bold">{formatSeconds(totalTimeElapsed)}</span>
+                  <span className="text-[10px] text-cyan-400/70 font-sans uppercase">Total</span>
+                </div>
               </div>
             )}
 

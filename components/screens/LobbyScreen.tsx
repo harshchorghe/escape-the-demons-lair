@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { GameGameState, gameSync } from "@/lib/gameStore";
+import { pythonApi } from "@/lib/pythonApi";
 import { LeaderboardModal } from "@/components/ui/LeaderboardModal";
 import { Users, Key, Play, ShieldAlert, CheckCircle2, Copy, Check, ArrowRight, ShieldCheck, Trophy } from "lucide-react";
 
@@ -113,14 +114,33 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     }
   };
 
-  const handleStartMission = () => {
+  const handleStartMission = async () => {
     if (!state.isPlayer1Ready || !state.isPlayer2Ready) {
       setErrorMsg('Both players must mark READY before starting!');
       return;
     }
+
+    const firestoreTimers = await gameSync.fetchDefaultLevelTimers();
+    const pythonTimers = await pythonApi.getTimerConfig();
+
+    const l1Sec = pythonTimers?.level1Seconds ?? firestoreTimers.level1Seconds ?? 120;
+    const l2Sec = pythonTimers?.level2Seconds ?? firestoreTimers.level2Seconds ?? 120;
+    const l3Sec = pythonTimers?.level3Seconds ?? firestoreTimers.level3Seconds ?? 300;
+
+    const now = Date.now();
+
+    if (state.teamCode) {
+      pythonApi.startRoomTimer(state.teamCode, 1);
+    }
+
     gameSync.updateState({
       currentLevel: 1,
-      timeRemaining: 120, // 2 minutes (120s) for Level 1
+      timeRemaining: l1Sec,
+      level1Duration: l1Sec,
+      level2Duration: l2Sec,
+      level3Duration: l3Sec,
+      levelStartTime: now,
+      missionStartTime: now,
       totalTimeElapsed: 0,
       timePenalties: 0,
       l1CompletedRooms: [],

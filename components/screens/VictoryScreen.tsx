@@ -27,7 +27,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
     }
 
     const recordScoreAndFetch = async () => {
-      const finalTime = state.l3TimeElapsed || 0; // Rank based on Level 3 only
+      const finalTotalTime = state.totalTimeElapsed || 0;
 
       // Save score to Firestore & Local storage with 3 levels completed!
       await saveTeamScore({
@@ -36,7 +36,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
         player1: state.player1Name || 'Player 1',
         player2: state.player2Name || 'Player 2',
         levelsCompleted: 3,
-        totalTimeSeconds: finalTime,
+        totalTimeSeconds: finalTotalTime,
         gameStatus: 'victory',
         date: new Date().toISOString().split('T')[0],
       });
@@ -47,7 +47,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
     };
 
     recordScoreAndFetch();
-  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.l3TimeElapsed]);
+  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.totalTimeElapsed]);
 
   const formatSeconds = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -102,8 +102,15 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
             <span className="text-lg font-mono font-bold text-white">{state.teamCode}</span>
           </div>
 
+          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+            <span className="text-xs font-mono text-zinc-400 uppercase block">Total Time Taken</span>
+            <span className="text-lg font-mono font-bold text-cyan-400">
+              {formatSeconds(state.totalTimeElapsed || 0)}
+            </span>
+          </div>
+
           <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl col-span-2">
-            <span className="text-xs font-mono text-zinc-400 uppercase block">Level 3 Completion Time (Rank Score)</span>
+            <span className="text-xs font-mono text-zinc-400 uppercase block">Level 3 Throne Room Time</span>
             <span className="text-lg font-mono font-bold text-emerald-400">
               {formatSeconds(state.l3TimeElapsed || 0)}
             </span>

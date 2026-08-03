@@ -60,6 +60,7 @@ export default function Home() {
         myRole={myRole}
         currentLevel={gameState.currentLevel}
         timeRemaining={gameState.timeRemaining}
+        totalTimeElapsed={gameState.totalTimeElapsed}
         onOpenPythonConfig={() => setIsPythonConfigOpen(true)}
       />
 
