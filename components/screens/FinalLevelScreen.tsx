@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { GameGameState, gameSync, ANCIENT_SEALS } from "@/lib/gameStore";
 import { pythonApi, FinalCrystalData, FALLBACK_FINAL_CRYSTALS } from "@/lib/pythonApi";
+import { puzzleService } from "@/lib/puzzleService";
 import { CheckCircle, AlertCircle, Zap, Lock, Clock, User } from "lucide-react";
 
 interface FinalLevelScreenProps {
@@ -26,7 +27,13 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
   const [submitting, setSubmitting] = useState(false);
   const [selectedSealId, setSelectedSealId] = useState<string | null>(null);
 
-  useEffect(() => { pythonApi.getFinalCrystals().then(setCrystals); }, []);
+  useEffect(() => {
+    puzzleService.getAssignedSetForTeam(3, state.teamCode).then((assignedCrystals) => {
+      if (Array.isArray(assignedCrystals) && assignedCrystals.length > 0) {
+        setCrystals(assignedCrystals);
+      }
+    });
+  }, [state.teamCode]);
 
   const destroyed = state.l3DestroyedCrystals;
   const allDone = destroyed.length === 4;
