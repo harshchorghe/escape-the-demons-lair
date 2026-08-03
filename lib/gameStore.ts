@@ -30,6 +30,11 @@ export interface GameGameState {
   totalTimeElapsed: number;
   timePenalties: number;
   l3TimeElapsed: number; // Level 3 only timer for leaderboard ranking
+  level1Duration: number;
+  level2Duration: number;
+  level3Duration: number;
+  levelStartTime?: number | null;
+  missionStartTime?: number | null;
   gameStatus: 'lobby' | 'playing' | 'gameover' | 'victory' | 'disqualified';
   lastUpdated: number;
 }
@@ -50,10 +55,15 @@ export const INITIAL_GAME_STATE: GameGameState = {
   collectedSealFragments: 0,
   selectedSeal: null,
   isDemonSealed: false,
-  timeRemaining: 120, // Level 1 timer: 2 minutes (120s)
+  timeRemaining: 60, // Level 1 default: 60s (1 min)
   totalTimeElapsed: 0,
   timePenalties: 0,
   l3TimeElapsed: 0,
+  level1Duration: 60,
+  level2Duration: 120,
+  level3Duration: 300,
+  levelStartTime: null,
+  missionStartTime: null,
   gameStatus: 'lobby',
   lastUpdated: Date.now(),
 };
@@ -89,6 +99,21 @@ class GameSyncManager {
       } catch (e) {
         console.warn('Failed to rehydrate session state:', e);
       }
+
+      // Auto-sync level timer configurations from Firestore/defaults
+      this.fetchDefaultLevelTimers().then((timers) => {
+        if (this.currentState.gameStatus === 'lobby') {
+          this.currentState = {
+            ...this.currentState,
+            timeRemaining: timers.level1Seconds,
+            level1Duration: timers.level1Seconds,
+            level2Duration: timers.level2Seconds,
+            level3Duration: timers.level3Seconds,
+          };
+          this.saveToSession(this.currentState);
+          this.notifyListeners();
+        }
+      });
 
       try {
         this.channel = new BroadcastChannel('escape_demons_lair_sync');
@@ -131,8 +156,33 @@ class GameSyncManager {
       this.firebaseUnsubscribe = onSnapshot(roomRef, (snapshot: any) => {
         if (snapshot.exists()) {
           const data = snapshot.data() as GameGameState;
-          this.currentState = data;
-          this.saveToSession(data);
+          // Guard: If incoming remote data is older than our local state update timestamp, do NOT overwrite!
+          if (data.lastUpdated && this.currentState.lastUpdated && data.lastUpdated < this.currentState.lastUpdated) {
+            return;
+          }
+          // Merge safely so array fields are never reset or set to undefined
+          this.currentState = {
+            ...INITIAL_GAME_STATE,
+            ...this.currentState,
+            ...data,
+            l1CompletedRooms: Array.from(new Set([
+              ...(this.currentState.l1CompletedRooms || []),
+              ...(data.l1CompletedRooms || []),
+            ])),
+            l1FailedRooms: Array.from(new Set([
+              ...(this.currentState.l1FailedRooms || []),
+              ...(data.l1FailedRooms || []),
+            ])),
+            l2UnlockedDoors: Array.from(new Set([
+              ...(this.currentState.l2UnlockedDoors || []),
+              ...(data.l2UnlockedDoors || []),
+            ])),
+            l3DestroyedCrystals: Array.from(new Set([
+              ...(this.currentState.l3DestroyedCrystals || []),
+              ...(data.l3DestroyedCrystals || []),
+            ])),
+          };
+          this.saveToSession(this.currentState);
           this.notifyListeners();
         }
       });
@@ -164,7 +214,23 @@ class GameSyncManager {
 
   public updateState(updater: Partial<GameGameState> | ((prev: GameGameState) => Partial<GameGameState>)) {
     const partialUpdate = typeof updater === 'function' ? updater(this.currentState) : updater;
-    const newState = { ...this.currentState, ...partialUpdate, lastUpdated: Date.now() };
+    const newState = {
+      ...this.currentState,
+      ...partialUpdate,
+      l1CompletedRooms: partialUpdate.l1CompletedRooms !== undefined 
+        ? partialUpdate.l1CompletedRooms 
+        : (this.currentState.l1CompletedRooms || []),
+      l1FailedRooms: partialUpdate.l1FailedRooms !== undefined 
+        ? partialUpdate.l1FailedRooms 
+        : (this.currentState.l1FailedRooms || []),
+      l2UnlockedDoors: partialUpdate.l2UnlockedDoors !== undefined 
+        ? partialUpdate.l2UnlockedDoors 
+        : (this.currentState.l2UnlockedDoors || []),
+      l3DestroyedCrystals: partialUpdate.l3DestroyedCrystals !== undefined 
+        ? partialUpdate.l3DestroyedCrystals 
+        : (this.currentState.l3DestroyedCrystals || []),
+      lastUpdated: Date.now(),
+    };
     
     this.currentState = newState;
     this.saveToSession(newState);
@@ -213,6 +279,27 @@ class GameSyncManager {
     }
 
     return null;
+  }
+
+  public async fetchDefaultLevelTimers(): Promise<{ level1Seconds: number; level2Seconds: number; level3Seconds: number }> {
+    const defaults = { level1Seconds: 120, level2Seconds: 120, level3Seconds: 300 };
+    if (isFirebaseInitialized && db) {
+      try {
+        const configRef = doc(db, 'config', 'levels');
+        const snapshot = await getDoc(configRef);
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          return {
+            level1Seconds: Number(data.level1Seconds) || defaults.level1Seconds,
+            level2Seconds: Number(data.level2Seconds) || defaults.level2Seconds,
+            level3Seconds: Number(data.level3Seconds) || defaults.level3Seconds,
+          };
+        }
+      } catch (e) {
+        console.warn("Firestore config/levels fetch warning:", e);
+      }
+    }
+    return defaults;
   }
 
   private notifyListeners() {

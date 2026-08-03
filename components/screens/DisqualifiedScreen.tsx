@@ -16,8 +16,7 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
 
   useEffect(() => {
     const recordFailAndFetch = async () => {
-      // If disqualified in Level 3, use l3TimeElapsed. Otherwise, use totalTimeElapsed (Level 1 & 2 survival time).
-      const rankTime = state.currentLevel === 3 ? (state.l3TimeElapsed || 0) : state.totalTimeElapsed;
+      const rankTime = state.totalTimeElapsed || 0;
 
       await saveTeamScore({
         teamCode: state.teamCode || 'LAIR-FAIL',
@@ -35,7 +34,7 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
     };
 
     recordFailAndFetch();
-  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.currentLevel, state.l3TimeElapsed]);
+  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.currentLevel, state.totalTimeElapsed]);
 
   const handleReturnToLobby = () => {
     // Reset state to lobby but keep team names and code
@@ -109,9 +108,9 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
             <span className="font-bold text-white">Level {state.currentLevel}</span>
           </div>
           <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 p-3 rounded-lg">
-            <span className="text-zinc-400">Time Survived:</span>
-            <span className="font-bold text-white">
-              {Math.floor((state.currentLevel === 3 ? (state.l3TimeElapsed || 0) : state.totalTimeElapsed) / 60)}m {(state.currentLevel === 3 ? (state.l3TimeElapsed || 0) : state.totalTimeElapsed) % 60}s
+            <span className="text-zinc-400">Total Time Survived:</span>
+            <span className="font-bold text-cyan-400">
+              {Math.floor((state.totalTimeElapsed || 0) / 60)}m {(state.totalTimeElapsed || 0) % 60}s
             </span>
           </div>
         </div>

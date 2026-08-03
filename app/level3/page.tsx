@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { GameGameState, INITIAL_GAME_STATE, gameSync } from "@/lib/gameStore";
+import { useGameTimer } from "@/hooks/useGameTimer";
 import { FinalLevelScreen } from "@/components/screens/FinalLevelScreen";
 import { HeaderHUD } from "@/components/ui/HeaderHUD";
 import { PythonConfigModal } from "@/components/ui/PythonConfigModal";
@@ -35,38 +36,8 @@ export default function Level3Page() {
     return () => unsubscribe();
   }, [router]);
 
-  // Main Level 3 Synchronized Timer Tick (5-minute countdown for Final Level)
-  useEffect(() => {
-    if (gameState.gameStatus !== 'playing' || gameState.currentLevel !== 3) return;
-    if (myRole !== 'player1') return; // Only Player 1 ticks the timer to prevent Firebase race conditions
-
-    const interval = setInterval(() => {
-      gameSync.updateState((prev) => {
-        if (prev.gameStatus !== 'playing' || prev.currentLevel !== 3) return prev;
-
-        const nextTime = prev.timeRemaining - 1;
-        const nextTotal = prev.totalTimeElapsed + 1;
-        const nextL3 = (prev.l3TimeElapsed || 0) + 1;
-
-        if (nextTime <= 0) {
-          return {
-            timeRemaining: 0,
-            totalTimeElapsed: nextTotal,
-            l3TimeElapsed: nextL3,
-            gameStatus: 'disqualified',
-          };
-        }
-
-        return {
-          timeRemaining: nextTime,
-          totalTimeElapsed: nextTotal,
-          l3TimeElapsed: nextL3,
-        };
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [gameState.gameStatus, gameState.currentLevel]);
+  // Universal synchronized game timer tick
+  useGameTimer(gameState, myRole);
 
   if (!isLoaded) {
     return (
@@ -86,6 +57,7 @@ export default function Level3Page() {
         myRole={myRole}
         currentLevel={gameState.currentLevel}
         timeRemaining={gameState.timeRemaining}
+        totalTimeElapsed={gameState.totalTimeElapsed}
         onOpenPythonConfig={() => setIsPythonConfigOpen(true)}
       />
 

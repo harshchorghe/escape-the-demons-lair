@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { GameGameState, INITIAL_GAME_STATE, gameSync } from "@/lib/gameStore";
+import { useGameTimer } from "@/hooks/useGameTimer";
 import { Level2Screen } from "@/components/screens/Level2Screen";
 import { FinalLevelScreen } from "@/components/screens/FinalLevelScreen";
 import { HeaderHUD } from "@/components/ui/HeaderHUD";
@@ -40,35 +41,8 @@ export default function Level2Page() {
     return () => unsubscribe();
   }, [router]);
 
-  // Level 2 Timer Tick (2-minute countdown) - Hosted by Player 1
-  useEffect(() => {
-    if (gameState.gameStatus !== 'playing' || gameState.currentLevel !== 2 || !gameState.l1IsCompleted) return;
-    if (myRole !== 'player1') return; // Only Player 1 ticks the timer to prevent Firebase race conditions
-
-    const interval = setInterval(() => {
-      gameSync.updateState((prev) => {
-        if (prev.gameStatus !== 'playing' || prev.currentLevel !== 2) return prev;
-
-        const nextTime = prev.timeRemaining - 1;
-        const nextTotal = prev.totalTimeElapsed + 1;
-
-        if (nextTime <= 0) {
-          return {
-            timeRemaining: 0,
-            totalTimeElapsed: nextTotal,
-            gameStatus: 'disqualified',
-          };
-        }
-
-        return {
-          timeRemaining: nextTime,
-          totalTimeElapsed: nextTotal,
-        };
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [gameState.gameStatus, gameState.currentLevel, gameState.l1IsCompleted]);
+  // Universal synchronized game timer tick
+  useGameTimer(gameState, myRole);
 
   if (!isLoaded) {
     return (
@@ -88,6 +62,7 @@ export default function Level2Page() {
         myRole={myRole}
         currentLevel={gameState.currentLevel}
         timeRemaining={gameState.timeRemaining}
+        totalTimeElapsed={gameState.totalTimeElapsed}
         onOpenPythonConfig={() => setIsPythonConfigOpen(true)}
       />
 

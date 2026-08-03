@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { GameGameState, gameSync } from "@/lib/gameStore";
+import { pythonApi } from "@/lib/pythonApi";
 import { Level2LockedScreen } from "@/components/screens/Level2LockedScreen";
 import { CheckCircle, AlertCircle, DoorOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -41,7 +42,18 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state }) => {
 
     if (id === correctId) {
       setFeedback({ success: true, message: "🎉 Correct door! Portal to the Throne Room opened!" });
-      gameSync.updateState({ l2UnlockedDoors: [id], currentLevel: 3, timeRemaining: 240 });
+      const now = Date.now();
+      const l3Sec = state.level3Duration || 300;
+      if (state.teamCode) {
+        pythonApi.startRoomTimer(state.teamCode, 3);
+      }
+      gameSync.updateState({
+        l2UnlockedDoors: [id],
+        currentLevel: 3,
+        timeRemaining: l3Sec,
+        levelStartTime: now,
+        timePenalties: 0,
+      });
       setTimeout(() => router.push('/level3'), 800);
     } else {
       setFeedback({ success: false, message: `💀 Demonic Trap! −30 seconds penalty!` });

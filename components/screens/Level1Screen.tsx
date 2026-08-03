@@ -62,7 +62,7 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   };
 
   const handleEnterRoom = (roomId: number) => {
-    if (state.l1CompletedRooms.includes(roomId) || (state.l1FailedRooms || []).includes(roomId)) return;
+    if ((state.l1CompletedRooms || []).includes(roomId) || (state.l1FailedRooms || []).includes(roomId)) return;
     setActiveRoomId(roomId);
     setUserAnswer('');
     setFeedback({ message: '' });
@@ -79,9 +79,23 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
     setFeedback(result);
     setSubmitting(false);
     if (result.success) {
-      const updatedCompleted = Array.from(new Set([...state.l1CompletedRooms, activeRoomId]));
+      const fresh = gameSync.getState();
+      const currentCompleted = fresh.l1CompletedRooms || [];
+      const updatedCompleted = Array.from(new Set([...currentCompleted, activeRoomId]));
       if (updatedCompleted.length >= 2) {
-        gameSync.updateState({ l1CompletedRooms: updatedCompleted, l1IsCompleted: true, currentLevel: 2, timeRemaining: 120 });
+        const now = Date.now();
+        const l2Sec = fresh.level2Duration || 120;
+        if (fresh.teamCode) {
+          pythonApi.startRoomTimer(fresh.teamCode, 2);
+        }
+        gameSync.updateState({
+          l1CompletedRooms: updatedCompleted,
+          l1IsCompleted: true,
+          currentLevel: 2,
+          timeRemaining: l2Sec,
+          levelStartTime: now,
+          timePenalties: 0,
+        });
       } else {
         gameSync.updateState({ l1CompletedRooms: updatedCompleted });
         setTimeout(() => setActiveRoomId(null), 1200);
@@ -90,7 +104,7 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   };
 
   const currentRoom = activeRoomId !== null ? rooms.find((r) => r.roomId === activeRoomId) || rooms[0] : null;
-  const completed = state.l1CompletedRooms.length;
+  const completed = (state.l1CompletedRooms || []).length;
   const failed = (state.l1FailedRooms || []).length;
   const timerPct = (roomTimer / 60) * 100;
   const timerColor = roomTimer <= 10 ? "bg-red-500" : roomTimer <= 25 ? "bg-amber-500" : "bg-emerald-500";
@@ -125,7 +139,7 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
         {/* Room cards */}
         <div className="grid grid-cols-1 gap-4">
           {rooms.map((room, idx) => {
-            const isDone = state.l1CompletedRooms.includes(room.roomId);
+            const isDone = (state.l1CompletedRooms || []).includes(room.roomId);
             const isFailed = (state.l1FailedRooms || []).includes(room.roomId);
             const isLocked = isDone || isFailed;
 
