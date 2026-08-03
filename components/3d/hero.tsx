@@ -19,6 +19,7 @@ export default function Hero({
 }: HeroProps) {
 
     const heroRef = useRef<THREE.Object3D>(null);
+    const timeoutRefs = useRef<number[]>([]);
     const { scene, animations } = useGLTF("/models/hero.glb");
     const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
     const { actions, mixer } = useAnimations(animations, clonedScene);
@@ -38,21 +39,57 @@ export default function Hero({
     useEffect(() => {
       if (!actions || Object.keys(actions).length === 0) return;
 
-      const firstClipName = animations[0]?.name;
-      const preferredAction = firstClipName
-        ? actions[firstClipName]
-        : Object.values(actions)[0];
+      const findActionByNames = (names: string[]) => {
+        for (const name of names) {
+          const action = actions[name];
+          if (action) return action;
+        }
+        return undefined;
+      };
 
-      if (!preferredAction) return;
+      const idleAction = findActionByNames(["idle", "Idle", "idle_pose", "IdlePose", "stand", "Stand", "idleAnimation"]);
+      const jumpAction = findActionByNames(["jump", "Jump", "hop", "Hop"]);
+      const attackAction = findActionByNames(["attack", "Attack", "slash", "Slash", "punch", "Punch"]);
+      const sequence = [idleAction, jumpAction, attackAction].filter((action): action is THREE.AnimationAction => !!action);
 
-      preferredAction.reset();
-      preferredAction.setLoop(THREE.LoopRepeat, Infinity);
-      preferredAction.fadeIn(0.3);
-      preferredAction.play();
+      if (sequence.length === 0) return;
+
+      let step = 0;
+
+      const playStep = () => {
+        const currentAction = sequence[step];
+
+        sequence.forEach((action, index) => {
+          if (index === step) {
+            action.reset();
+            action.setLoop(THREE.LoopRepeat, 1);
+            action.clampWhenFinished = true;
+            action.fadeIn(0.35);
+            action.play();
+          } else {
+            action.fadeOut(0.35);
+            action.stop();
+          }
+        });
+
+        const clipDuration = currentAction?.getClip()?.duration ?? 1;
+        const timeoutId = window.setTimeout(() => {
+          step = (step + 1) % sequence.length;
+          playStep();
+        }, Math.max(clipDuration * 1000 - 120, 300));
+
+        timeoutRefs.current.push(timeoutId);
+      };
+
+      playStep();
 
       return () => {
-        preferredAction.fadeOut(0.3);
-        preferredAction.stop();
+        timeoutRefs.current.forEach((id) => window.clearTimeout(id));
+        timeoutRefs.current = [];
+        sequence.forEach((action) => {
+          action.fadeOut(0.18);
+          action.stop();
+        });
       };
     }, [actions, animations]);
     

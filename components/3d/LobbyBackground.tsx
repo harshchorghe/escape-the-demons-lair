@@ -13,7 +13,7 @@ export default function LobbyBackground() {
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
       >
-        <PerspectiveCamera makeDefault position={[0, 1.5, 6.4]} fov={34} />
+        <PerspectiveCamera makeDefault position={[0, 1.65, 6.6]} fov={33} />
         <ambientLight intensity={2} />
 
         <directionalLight
@@ -22,7 +22,7 @@ export default function LobbyBackground() {
         />
 
         <Suspense fallback={null}>
-          <Hero position={[0.2, -0.35, 0]} scale={1.08} rotation={[0, -0.12, 0]} />
+          <Hero position={[0.25, 0.18, 0]} scale={1.16} rotation={[0, -0.12, 0]} />
         </Suspense>
       </Canvas>
     </div>
