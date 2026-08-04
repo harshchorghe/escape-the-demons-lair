@@ -52,7 +52,7 @@ export async function saveTeamScore(score: Omit<LeaderboardEntry, 'id' | 'timest
   if (typeof window !== 'undefined') {
     try {
       const local = localStorage.getItem('demons_lair_leaderboard');
-      let list: LeaderboardEntry[] = local ? JSON.parse(local) : [];
+      let list: LeaderboardEntry[] = (local && local.trim() && local !== "undefined") ? JSON.parse(local) : [];
       list = list.filter((item) => item.teamCode !== score.teamCode);
       list.push(entry);
       const sorted = sortLeaderboardEntries(list);
@@ -89,7 +89,7 @@ export async function getAllTeamsLeaderboard(maxLimit: number = 25): Promise<Lea
   if (entries.length === 0 && typeof window !== 'undefined') {
     try {
       const local = localStorage.getItem('demons_lair_leaderboard');
-      if (local) {
+      if (local && local.trim() && local !== "undefined") {
         entries = JSON.parse(local);
       }
     } catch (e) {

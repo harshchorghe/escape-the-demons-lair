@@ -22,6 +22,7 @@ export interface GameGameState {
   l1FailedRooms: number[];
   l1IsCompleted: boolean;
   l2UnlockedDoors: number[];
+  l2Score?: number;
   l3DestroyedCrystals: number[];
   collectedSealFragments: number;
   selectedSeal: string | null;
@@ -57,6 +58,7 @@ export const INITIAL_GAME_STATE: GameGameState = {
   l1FailedRooms: [],
   l1IsCompleted: false,
   l2UnlockedDoors: [],
+  l2Score: 0,
   l3DestroyedCrystals: [],
   collectedSealFragments: 0,
   selectedSeal: null,
@@ -102,7 +104,7 @@ class GameSyncManager {
       // Rehydrate from sessionStorage if available
       try {
         const saved = sessionStorage.getItem('demons_lair_state');
-        if (saved) {
+        if (saved && saved.trim() && saved !== "undefined") {
           const parsed = JSON.parse(saved);
           if (parsed && parsed.teamCode) {
             this.currentState = parsed;
@@ -197,6 +199,9 @@ class GameSyncManager {
           this.saveToSession(this.currentState);
           this.notifyListeners();
         }
+      }, (error) => {
+        // Handle connection drop or offline status gracefully
+        console.warn("Firestore offline/fallback active:", error?.message || error);
       });
     } catch (e) {
       console.warn("Firebase onSnapshot subscription error:", e);

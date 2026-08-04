@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.7.0",
     "canvas-confetti": "^1.9.4",
@@ -17,7 +18,8 @@
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "three": "^0.174.0"
+    "three": "^0.174.0",
+    "three-stdlib": "^2.36.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

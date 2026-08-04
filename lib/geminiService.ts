@@ -98,66 +98,48 @@ Return strict JSON matching format: [{ "setId": "set_1", "crystals": [...] }]`;
 
   // ── FALLBACK SET GENERATORS ─────────────────────────────────────────
   private generateFallbackLevel1Sets(count: number): Array<{ setId: string; rooms: Level1RoomData[] }> {
-    const templates = [
-      { sq: 5, ansSq: "25", rid: "FIRE", isPrimeNum: 37, isPrimeAns: "TRUE" },
-      { sq: 6, ansSq: "36", rid: "SHADOW", isPrimeNum: 29, isPrimeAns: "TRUE" },
-      { sq: 7, ansSq: "49", rid: "BLOOD", isPrimeNum: 15, isPrimeAns: "FALSE" },
-      { sq: 8, ansSq: "64", rid: "MIRROR", isPrimeNum: 41, isPrimeAns: "TRUE" },
-      { sq: 9, ansSq: "81", rid: "SILENCE", isPrimeNum: 49, isPrimeAns: "FALSE" },
-      { sq: 10, ansSq: "100", rid: "COFFIN", isPrimeNum: 53, isPrimeAns: "TRUE" },
-      { sq: 11, ansSq: "121", rid: "SKULL", isPrimeNum: 63, isPrimeAns: "FALSE" },
-      { sq: 12, ansSq: "144", rid: "GRAVE", isPrimeNum: 67, isPrimeAns: "TRUE" },
-      { sq: 13, ansSq: "169", rid: "PHANTOM", isPrimeNum: 77, isPrimeAns: "FALSE" },
-      { sq: 14, ansSq: "196", rid: "ABYSS", isPrimeNum: 79, isPrimeAns: "TRUE" },
-    ];
-
     return Array.from({ length: count }, (_, idx) => {
-      const t = templates[idx % templates.length];
       const setNum = idx + 1;
       return {
         setId: `set_${setNum}`,
         rooms: [
           {
             roomId: 1,
-            name: `Room 1: Cursed Logic (Set ${setNum})`,
-            description: "Solve the spectral number altar sequence to break the seal.",
+            name: `Chamber 1: The Gravity Well (Set ${setNum})`,
+            description: "Shift room gravity UP, DOWN, LEFT, or RIGHT to slide across the floor, collect the rune key, and reach the exit.",
             puzzle: {
               id: `l1_s${setNum}_r1`,
-              title: `Rune Pattern #${setNum}`,
-              description: `If 2 -> 4, 3 -> 9, 4 -> 16, what number completes ${t.sq} -> ?`,
-              type: "puzzle",
-              targetAnswer: t.ansSq,
-              options: [t.ansSq, (Number(t.ansSq) - 5).toString(), (Number(t.ansSq) + 10).toString(), (Number(t.ansSq) * 2).toString()].sort(),
-              hint: `The input number is squared (${t.sq} * ${t.sq}).`
+              title: `Gravity Shift Vault 1 #${setNum}`,
+              description: "Shift gravity direction to reach the exit portal.",
+              type: "gravity",
+              targetAnswer: "GRAVITY_SOLVED",
+              hint: "Use Arrow keys, WASD, or control buttons to change gravity."
             }
           },
           {
             roomId: 2,
-            name: `Room 2: Spectral Riddle (Set ${setNum})`,
-            description: "Carved into the obsidian sanctuary wall is a dark enigma.",
+            name: `Chamber 2: Spike Vault Matrix (Set ${setNum})`,
+            description: "Demonic spikes litter the floor. Carefully tilt gravity to avoid traps, collect all keys, and enter the exit portal.",
             puzzle: {
               id: `l1_s${setNum}_r2`,
-              title: `Cryptic Riddle #${setNum}`,
-              description: `I dwell in darkness, follow your steps, yet disappear in total shadow. What am I?`,
-              type: "riddle",
-              targetAnswer: t.rid,
-              options: [t.rid, "FIRE", "WIND", "ICE"],
-              hint: `Answer is: ${t.rid}`
+              title: `Gravity Shift Vault 2 #${setNum}`,
+              description: "Avoid spike traps while shifting gravity.",
+              type: "gravity",
+              targetAnswer: "GRAVITY_SOLVED",
+              hint: "Watch out for spike tiles that reset your position!"
             }
           },
           {
             roomId: 3,
-            name: `Room 3: Python Altar (Set ${setNum})`,
-            description: "Write the logic to verify prime runes for portal teleportation.",
+            name: `Chamber 3: Abyssal Gravity Core (Set ${setNum})`,
+            description: "Navigate narrow spike corridors and collect multiple keys before unsealing the final portal.",
             puzzle: {
               id: `l1_s${setNum}_r3`,
-              title: `Prime Evaluator #${setNum}`,
-              description: `Evaluate Python code: Is ${t.isPrimeNum} a Prime Number?`,
-              type: "code",
-              initialCode: `def is_prime(n):\n    if n <= 1: return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True\nprint(is_prime(${t.isPrimeNum}))`,
-              targetAnswer: t.isPrimeAns,
-              options: ["TRUE", "FALSE"],
-              hint: `${t.isPrimeNum} prime test evaluated.`
+              title: `Gravity Shift Vault 3 #${setNum}`,
+              description: "Collect all rune keys in the abyssal gravity maze.",
+              type: "gravity",
+              targetAnswer: "GRAVITY_SOLVED",
+              hint: "Collect all keys to unseal the exit portal."
             }
           }
         ]

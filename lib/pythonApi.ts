@@ -2,7 +2,7 @@ export interface PuzzleItem {
   id: string;
   title: string;
   description: string;
-  type: 'puzzle' | 'riddle' | 'code' | 'cipher';
+  type: 'puzzle' | 'riddle' | 'code' | 'cipher' | 'gravity';
   initialCode?: string;
   targetAnswer: string;
   hint?: string;
@@ -35,45 +35,41 @@ export interface FinalCrystalData {
 export const FALLBACK_L1_ROOMS: Level1RoomData[] = [
   {
     roomId: 1,
-    name: "Room 1: Cursed Logic Puzzle",
-    description: "An ancient spectral altar presents a logic sequence test. Solve the pattern to unlock the altar energy.",
+    name: "Chamber 1: The Gravity Well",
+    description: "Shift room gravity UP, DOWN, LEFT, or RIGHT to slide across the floor, collect the rune key, and reach the exit.",
     puzzle: {
       id: "l1_p1",
-      title: "Rune Sequence Logic",
-      description: "If 2 -> 4, 3 -> 9, 4 -> 16, what number completes 5 -> ?",
-      type: "puzzle",
-      targetAnswer: "25",
-      options: ["20", "25", "30", "125"],
-      hint: "Each number is squared (n * n)."
+      title: "Gravity Shift Vault 1",
+      description: "Shift gravity direction to reach the exit portal.",
+      type: "gravity",
+      targetAnswer: "GRAVITY_SOLVED",
+      hint: "Use Arrow keys, WASD, or control buttons to change gravity."
     }
   },
   {
     roomId: 2,
-    name: "Room 2: Spectral Riddle",
-    description: "Carved into the obsidian wall is a riddle that guards the door mechanism.",
+    name: "Chamber 2: Spike Vault Matrix",
+    description: "Demonic spikes litter the floor. Carefully tilt gravity to avoid traps, collect all keys, and enter the exit portal.",
     puzzle: {
       id: "l1_p2",
-      title: "Riddle of the Void Flame",
-      description: "I have no lungs, but I need air; I have no mouth, but water kills me. What am I?",
-      type: "riddle",
-      targetAnswer: "FIRE",
-      options: ["FIRE", "SHADOW", "WIND", "ICE"],
-      hint: "It consumes oxygen and dies when wet."
+      title: "Gravity Shift Vault 2",
+      description: "Avoid spike traps while shifting gravity.",
+      type: "gravity",
+      targetAnswer: "GRAVITY_SOLVED",
+      hint: "Watch out for spike tiles that reset your position!"
     }
   },
   {
     roomId: 3,
-    name: "Room 3: Python Altar Code",
-    description: "The altar requires the correct prime rune sequence written in Python to open the portal.",
+    name: "Chamber 3: Abyssal Gravity Core",
+    description: "Navigate narrow spike corridors and collect multiple keys before unsealing the final portal.",
     puzzle: {
       id: "l1_p3",
-      title: "Prime Rune Calculator",
-      description: "Write the logic to check if number 37 is a Prime Number.",
-      type: "code",
-      initialCode: "def is_prime(n):\n    if n <= 1: return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True\n# Result for 37:\nprint(is_prime(37))",
-      targetAnswer: "TRUE",
-      options: ["TRUE", "FALSE"],
-      hint: "37 has no divisors other than 1 and itself."
+      title: "Gravity Shift Vault 3",
+      description: "Collect all rune keys in the abyssal gravity maze.",
+      type: "gravity",
+      targetAnswer: "GRAVITY_SOLVED",
+      hint: "Collect all keys to unseal the exit portal."
     }
   }
 ];
@@ -219,7 +215,8 @@ export class PythonApiService {
     try {
       const res = await fetch(`${this.baseUrl}/api/timer/config`, { signal: AbortSignal.timeout(500) });
       if (res.ok) {
-        return await res.json();
+        const text = await res.text();
+        if (text && text.trim()) return JSON.parse(text);
       }
     } catch {
       // Python API is offline
@@ -236,7 +233,8 @@ export class PythonApiService {
         signal: AbortSignal.timeout(500)
       });
       if (res.ok) {
-        return await res.json();
+        const text = await res.text();
+        if (text && text.trim()) return JSON.parse(text);
       }
     } catch {
       // Fallback
@@ -253,7 +251,8 @@ export class PythonApiService {
         signal: AbortSignal.timeout(500)
       });
       if (res.ok) {
-        return await res.json();
+        const text = await res.text();
+        if (text && text.trim()) return JSON.parse(text);
       }
     } catch {
       // Fallback
@@ -265,8 +264,11 @@ export class PythonApiService {
     try {
       const res = await fetch(`${this.baseUrl}/api/puzzles/level1`, { signal: AbortSignal.timeout(500) });
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        const text = await res.text();
+        if (text && text.trim()) {
+          const data = JSON.parse(text);
+          if (Array.isArray(data) && data.length > 0) return data;
+        }
       }
     } catch {
       // Fallback
@@ -278,8 +280,11 @@ export class PythonApiService {
     try {
       const res = await fetch(`${this.baseUrl}/api/puzzles/level2`, { signal: AbortSignal.timeout(500) });
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        const text = await res.text();
+        if (text && text.trim()) {
+          const data = JSON.parse(text);
+          if (Array.isArray(data) && data.length > 0) return data;
+        }
       }
     } catch {
       // Fallback
@@ -291,8 +296,11 @@ export class PythonApiService {
     try {
       const res = await fetch(`${this.baseUrl}/api/puzzles/final`, { signal: AbortSignal.timeout(500) });
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        const text = await res.text();
+        if (text && text.trim()) {
+          const data = JSON.parse(text);
+          if (Array.isArray(data) && data.length > 0) return data;
+        }
       }
     } catch {
       // Fallback
@@ -309,7 +317,8 @@ export class PythonApiService {
         signal: AbortSignal.timeout(500)
       });
       if (res.ok) {
-        return await res.json();
+        const text = await res.text();
+        if (text && text.trim()) return JSON.parse(text);
       }
     } catch {
       // Fallback checking
@@ -317,13 +326,18 @@ export class PythonApiService {
 
     const cleanUser = answer.trim().toUpperCase();
 
+    // Check Gravity Shift completion code
+    if (cleanUser === "GRAVITY_SOLVED" || cleanUser.includes("GRAVITY")) {
+      return { success: true, message: "Access Granted! Gravity Vault unsealed." };
+    }
+
     // Check L1
     for (const room of FALLBACK_L1_ROOMS) {
       const target = room.puzzle.targetAnswer.toUpperCase();
       if (room.puzzle.id === puzzleId || cleanUser === target || cleanUser.includes(target)) {
         const correct = cleanUser === target || cleanUser.includes(target);
         if (correct || room.puzzle.id === puzzleId) {
-          return { success: correct, message: correct ? "Access Granted! Teleportation node illuminated." : "Incorrect rune code. Try again." };
+          return { success: correct, message: correct ? "Access Granted! Altar node illuminated." : "Incorrect rune code. Try again." };
         }
       }
     }
