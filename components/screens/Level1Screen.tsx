@@ -5,6 +5,7 @@ import { GameGameState, gameSync } from "@/lib/gameStore";
 import { pythonApi, Level1RoomData, FALLBACK_L1_ROOMS } from "@/lib/pythonApi";
 import { puzzleService } from "@/lib/puzzleService";
 import { CheckCircle, Timer, AlertCircle, ArrowRight, RotateCcw, HelpCircle } from "lucide-react";
+import BackgroundVideo from "../3d/BackgroundVideo";
 
 interface Level1ScreenProps {
   state: GameGameState;
@@ -117,79 +118,82 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   // ── ROOM SELECTION HUB ──────────────────────────────────────────────
   if (activeRoomId === null) {
     return (
-      <div className="w-full max-w-2xl mx-auto px-4 py-8 space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <p className="text-xs font-mono tracking-widest text-red-400 uppercase">Level 1 · Haunted Chambers</p>
-          <h2 className="text-3xl font-extrabold text-white font-serif">Choose a Room</h2>
-          <p className="text-sm text-zinc-400">Clear any <strong className="text-emerald-400">2 of 3 rooms</strong> to advance. Each room gives you <strong className="text-amber-400">60 seconds</strong>.</p>
-        </div>
-
-        {/* Progress bar */}
-        <div className="flex items-center gap-3">
-          {[0, 1].map((i) => (
-            <div key={i} className={`flex-1 h-2 rounded-full transition-all duration-500 ${i < completed ? 'bg-emerald-500' : 'bg-zinc-800'}`} />
-          ))}
-          <span className="text-xs font-mono text-zinc-400 shrink-0">{completed}/2</span>
-        </div>
-
-        {/* Timeout warning */}
-        {feedback.message && (
-          <div className="flex items-center gap-3 bg-amber-950/60 border border-amber-600/40 rounded-xl px-4 py-3 text-sm text-amber-300 font-mono">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-            {feedback.message}
+      <div className="relative w-full min-h-screen overflow-hidden">
+        <BackgroundVideo src="/videos/level_1.mp4" />
+        <div className="relative z-10 max-w-2xl mx-auto px-4 py-8 space-y-8">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <p className="text-xs font-mono tracking-widest text-red-400 uppercase">Level 1 · Haunted Chambers</p>
+            <h2 className="text-3xl font-extrabold text-white font-serif">Choose a Room</h2>
+            <p className="text-sm text-zinc-400">Clear any <strong className="text-emerald-400">2 of 3 rooms</strong> to advance. Each room gives you <strong className="text-amber-400">60 seconds</strong>.</p>
           </div>
-        )}
 
-        {/* Room cards */}
-        <div className="grid grid-cols-1 gap-4">
-          {rooms.map((room, idx) => {
-            const isDone = (state.l1CompletedRooms || []).includes(room.roomId);
-            const isFailed = (state.l1FailedRooms || []).includes(room.roomId);
-            const isLocked = isDone || isFailed;
+          {/* Progress bar */}
+          <div className="flex items-center gap-3">
+            {[0, 1].map((i) => (
+              <div key={i} className={`flex-1 h-2 rounded-full transition-all duration-500 ${i < completed ? 'bg-emerald-500' : 'bg-zinc-800'}`} />
+            ))}
+            <span className="text-xs font-mono text-zinc-400 shrink-0">{completed}/2</span>
+          </div>
 
-            return (
-              <button
-                key={room.roomId}
-                onClick={() => handleEnterRoom(room.roomId)}
-                disabled={isLocked}
-                className={`w-full text-left rounded-2xl border p-5 bg-gradient-to-br transition-all duration-300 group ${
-                  isDone
-                    ? 'border-emerald-600/50 from-emerald-950/50 to-emerald-950/30 opacity-80 cursor-default'
-                    : isFailed
-                    ? 'border-zinc-700/40 from-zinc-950 to-zinc-950 opacity-50 cursor-default'
-                    : `${ROOM_COLORS[idx]} cursor-pointer hover:scale-[1.01] active:scale-[0.99]`
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-3xl shrink-0 ${
-                    isDone ? 'bg-emerald-900/60' : isFailed ? 'bg-zinc-900/60' : 'bg-black/30'
-                  }`}>
-                    {isDone ? <CheckCircle className="w-8 h-8 text-emerald-400" /> : isFailed ? '💀' : ROOM_ICONS[idx]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-500">Room {room.roomId}</span>
-                      {isDone && <span className="text-[10px] bg-emerald-900/80 text-emerald-400 border border-emerald-600/40 font-mono px-2 py-0.5 rounded-full font-bold">CLEARED ✓</span>}
-                      {isFailed && <span className="text-[10px] bg-red-950/80 text-red-400 border border-red-800/40 font-mono px-2 py-0.5 rounded-full font-bold">TIMED OUT</span>}
+          {/* Timeout warning */}
+          {feedback.message && (
+            <div className="flex items-center gap-3 bg-amber-950/60 border border-amber-600/40 rounded-xl px-4 py-3 text-sm text-amber-300 font-mono">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              {feedback.message}
+            </div>
+          )}
+
+          {/* Room cards */}
+          <div className="grid grid-cols-1 gap-4">
+            {rooms.map((room, idx) => {
+              const isDone = (state.l1CompletedRooms || []).includes(room.roomId);
+              const isFailed = (state.l1FailedRooms || []).includes(room.roomId);
+              const isLocked = isDone || isFailed;
+
+              return (
+                <button
+                  key={room.roomId}
+                  onClick={() => handleEnterRoom(room.roomId)}
+                  disabled={isLocked}
+                  className={`w-full text-left rounded-2xl border p-5 bg-gradient-to-br transition-all duration-300 group ${
+                    isDone
+                      ? 'border-emerald-600/50 from-emerald-950/50 to-emerald-950/30 opacity-80 cursor-default'
+                      : isFailed
+                      ? 'border-zinc-700/40 from-zinc-950 to-zinc-950 opacity-50 cursor-default'
+                      : `${ROOM_COLORS[idx]} cursor-pointer hover:scale-[1.01] active:scale-[0.99]`
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-3xl shrink-0 ${
+                      isDone ? 'bg-emerald-900/60' : isFailed ? 'bg-zinc-900/60' : 'bg-black/30'
+                    }`}>
+                      {isDone ? <CheckCircle className="w-8 h-8 text-emerald-400" /> : isFailed ? '💀' : ROOM_ICONS[idx]}
                     </div>
-                    <h3 className="text-lg font-bold text-white">{room.name}</h3>
-                    <p className="text-xs text-zinc-400 truncate">{room.description}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-500">Room {room.roomId}</span>
+                        {isDone && <span className="text-[10px] bg-emerald-900/80 text-emerald-400 border border-emerald-600/40 font-mono px-2 py-0.5 rounded-full font-bold">CLEARED ✓</span>}
+                        {isFailed && <span className="text-[10px] bg-red-950/80 text-red-400 border border-red-800/40 font-mono px-2 py-0.5 rounded-full font-bold">TIMED OUT</span>}
+                      </div>
+                      <h3 className="text-lg font-bold text-white">{room.name}</h3>
+                      <p className="text-xs text-zinc-400 truncate">{room.description}</p>
+                    </div>
+                    {!isLocked && (
+                      <ArrowRight className="w-5 h-5 text-zinc-400 group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
+                    )}
                   </div>
-                  {!isLocked && (
-                    <ArrowRight className="w-5 h-5 text-zinc-400 group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                </button>
+              );
+            })}
+          </div>
 
-        {failed > 0 && (
-          <p className="text-center text-xs text-zinc-500 font-mono">
-            ⚠️ {failed} room{failed > 1 ? 's' : ''} timed out · {2 - completed} more needed · {failed >= 2 ? 'Disqualified!' : 'Still in the game!'}
-          </p>
-        )}
+          {failed > 0 && (
+            <p className="text-center text-xs text-zinc-500 font-mono">
+              ⚠️ {failed} room{failed > 1 ? 's' : ''} timed out · {2 - completed} more needed · {failed >= 2 ? 'Disqualified!' : 'Still in the game!'}
+            </p>
+          )}
+        </div>
       </div>
     );
   }

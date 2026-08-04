@@ -7,99 +7,145 @@ import { useGLTF, useAnimations } from "@react-three/drei";
 import { SkeletonUtils } from "three-stdlib";
 
 interface HeroProps {
-    position?: [number, number, number];
-    scale?: number;
-    rotation?: [number, number, number];
+  position?: [number, number, number];
+  scale?: number;
+  rotation?: [number, number, number];
 }
 
 export default function Hero({
-    position = [0, 0, 0],
-    scale = 1,
-    rotation = [0, 0, 0],
+  position = [0, 0, 0],
+  scale = 1,
+  rotation = [0, 0, 0],
 }: HeroProps) {
+  const heroRef = useRef<THREE.Object3D>(null);
+  const idleTimeout = useRef<number | null>(null);
 
-    const heroRef = useRef<THREE.Object3D>(null);
-    const timeoutRefs = useRef<number[]>([]);
-    const { scene, animations } = useGLTF("/models/hero.glb");
-    const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
-    const { actions, mixer } = useAnimations(animations, clonedScene);
+  const { scene, animations } = useGLTF("/models/hero.glb");
+  const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
 
-    useEffect(() => {
-      console.log("hero.glb animations.length:", animations.length);
-      console.log("hero.glb animation names:", animations.map((clip) => clip.name));
-      console.log("hero.glb action keys:", Object.keys(actions));
-    }, [actions, animations]);
+  const { actions, mixer } = useAnimations(animations, clonedScene);
 
-    useFrame((_, delta) => {
-      if (mixer) {
-        mixer.update(delta);
+  useFrame((_, delta) => {
+    mixer?.update(delta);
+  });
+
+  useEffect(() => {
+    if (!actions || !mixer) return;
+
+    const findAction = (names: string[]) => {
+      for (const name of names) {
+        if (actions[name]) return actions[name];
       }
+      return undefined;
+    };
+
+    const idle = findAction([
+      "idle",
+      "Idle",
+      "idle_pose",
+      "IdlePose",
+      "stand",
+      "Stand",
+      "idleAnimation",
+    ]);
+
+    const jump = findAction([
+      "jump",
+      "Jump",
+      "hop",
+      "Hop",
+    ]);
+
+    const attack = findAction([
+      "attack",
+      "Attack",
+      "slash",
+      "Slash",
+      "punch",
+      "Punch",
+    ]);
+
+    const sequence = [idle, jump, attack].filter(
+      (a): a is THREE.AnimationAction => !!a
+    );
+
+    if (sequence.length === 0) return;
+
+    sequence.forEach((action) => {
+      action.enabled = true;
+      action.clampWhenFinished = true;
+      action.setEffectiveWeight(1);
+      action.setEffectiveTimeScale(1);
     });
 
-    useEffect(() => {
-      if (!actions || Object.keys(actions).length === 0) return;
+    let currentIndex = 0;
+    let currentAction = sequence[currentIndex];
 
-      const findActionByNames = (names: string[]) => {
-        for (const name of names) {
-          const action = actions[name];
-          if (action) return action;
-        }
-        return undefined;
-      };
+    const playCurrent = () => {
+      currentAction.reset();
 
-      const idleAction = findActionByNames(["idle", "Idle", "idle_pose", "IdlePose", "stand", "Stand", "idleAnimation"]);
-      const jumpAction = findActionByNames(["jump", "Jump", "hop", "Hop"]);
-      const attackAction = findActionByNames(["attack", "Attack", "slash", "Slash", "punch", "Punch"]);
-      const sequence = [idleAction, jumpAction, attackAction].filter((action): action is THREE.AnimationAction => !!action);
+      if (currentAction === idle) {
+        currentAction.setLoop(THREE.LoopRepeat, Infinity);
+      } else {
+        currentAction.setLoop(THREE.LoopOnce, 1);
+      }
 
-      if (sequence.length === 0) return;
+      currentAction.fadeIn(0.5).play();
 
-      let step = 0;
+      // Only keep idle for 1.5 seconds
+      if (currentAction === idle) {
+        idleTimeout.current = window.setTimeout(() => {
+          const previous = currentAction;
 
-      const playStep = () => {
-        const currentAction = sequence[step];
+          currentIndex = (currentIndex + 1) % sequence.length;
+          currentAction = sequence[currentIndex];
 
-        sequence.forEach((action, index) => {
-          if (index === step) {
-            action.reset();
-            action.setLoop(THREE.LoopRepeat, 1);
-            action.clampWhenFinished = true;
-            action.fadeIn(0.35);
-            action.play();
-          } else {
-            action.fadeOut(0.35);
-            action.stop();
-          }
-        });
+          previous.crossFadeTo(currentAction, 0.5, true);
 
-        const clipDuration = currentAction?.getClip()?.duration ?? 1;
-        const timeoutId = window.setTimeout(() => {
-          step = (step + 1) % sequence.length;
-          playStep();
-        }, Math.max(clipDuration * 1000 - 120, 300));
+          playCurrent();
+        }, 3000);
+      }
+    };
 
-        timeoutRefs.current.push(timeoutId);
-      };
+    playCurrent();
 
-      playStep();
+    const onFinished = () => {
+      if (currentAction === idle) return;
 
-      return () => {
-        timeoutRefs.current.forEach((id) => window.clearTimeout(id));
-        timeoutRefs.current = [];
-        sequence.forEach((action) => {
-          action.fadeOut(0.18);
-          action.stop();
-        });
-      };
-    }, [actions, animations]);
-    
-    return (
-        <primitive
-            ref={heroRef}
-            object={clonedScene}
-            position={position}
-            rotation={rotation}
-            scale={scale}
-        />
-    );
+      const previous = currentAction;
+
+      currentIndex = (currentIndex + 1) % sequence.length;
+      currentAction = sequence[currentIndex];
+
+      previous.crossFadeTo(currentAction, 0.5, true);
+
+      playCurrent();
+    };
+
+    mixer.addEventListener("finished", onFinished);
+
+    return () => {
+      mixer.removeEventListener("finished", onFinished);
+
+      if (idleTimeout.current) {
+        clearTimeout(idleTimeout.current);
+      }
+
+      sequence.forEach((action) => {
+        action.stop();
+      });
+    };
+  }, [actions, mixer]);
+
+  return (
+    <primitive
+      ref={heroRef}
+      object={clonedScene}
+      position={position}
+      rotation={rotation}
+      scale={scale}
+    />
+  );
 }
+
+useGLTF.preload("/models/hero.glb");

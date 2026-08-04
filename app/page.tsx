@@ -53,7 +53,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-red-900 selection:text-white font-sans">
+    <div className="h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-red-900 selection:text-white font-sans overflow-hidden">
       {/* Header HUD Bar */}
       <HeaderHUD
         teamCode={gameState.teamCode}
@@ -65,7 +65,7 @@ export default function Home() {
       />
 
       {/* Main Content Area - only lobby shown here; levels have dedicated routes */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4">
+      <main className="flex-1 overflow-hidden">
         {/* Lobby Screen */}
         {gameState.gameStatus === 'lobby' && (
           <LobbyScreen

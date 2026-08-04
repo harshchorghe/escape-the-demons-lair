@@ -7,13 +7,15 @@ import Hero from "./hero";
 
 export default function LobbyBackground() {
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full pointer-events-none">
       <Canvas
         className="h-full w-full"
         gl={{ antialias: true, alpha: true }}
-        dpr={[1, 2]}
+        onCreated={({ gl }) => {
+        gl.setClearColor(0x000000, 0);
+    }}
       >
-        <PerspectiveCamera makeDefault position={[0, 1.65, 6.6]} fov={33} />
+        <PerspectiveCamera makeDefault position={[0, 1.45, 5.8]} fov={33} />
         <ambientLight intensity={2} />
 
         <directionalLight
@@ -22,7 +24,7 @@ export default function LobbyBackground() {
         />
 
         <Suspense fallback={null}>
-          <Hero position={[0.25, 0.18, 0]} scale={1.16} rotation={[0, -0.12, 0]} />
+          <Hero   position={[0.25, 0.30, 0]} scale={1.00} rotation={[0, -0.12, 0]} />
         </Suspense>
       </Canvas>
     </div>
