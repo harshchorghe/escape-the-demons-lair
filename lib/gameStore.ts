@@ -90,7 +90,7 @@ class GameSyncManager {
       // Rehydrate from sessionStorage if available
       try {
         const saved = sessionStorage.getItem('demons_lair_state');
-        if (saved) {
+        if (saved && saved.trim() && saved !== "undefined") {
           const parsed = JSON.parse(saved);
           if (parsed && parsed.teamCode) {
             this.currentState = parsed;
