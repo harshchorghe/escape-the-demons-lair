@@ -187,6 +187,9 @@ class GameSyncManager {
           this.saveToSession(this.currentState);
           this.notifyListeners();
         }
+      }, (error) => {
+        // Handle connection drop or offline status gracefully
+        console.warn("Firestore offline/fallback active:", error?.message || error);
       });
     } catch (e) {
       console.warn("Firebase onSnapshot subscription error:", e);
