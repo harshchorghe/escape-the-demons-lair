@@ -15,11 +15,11 @@ app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Resource Sharing for Next.js frontend
 
 # ── DEFAULT TIMER CONFIGURATION ───────────────────────────────────────
-# Default level durations in seconds (Level 1: 60s, Level 2: 120s, Level 3: 300s)
+# Default level durations in seconds (Level 1: 60s, Level 2: 120s, Level 3: 210s)
 TIMER_CONFIG = {
     "level1Seconds": 60,
     "level2Seconds": 120,
-    "level3Seconds": 300
+    "level3Seconds": 210
 }
 
 # In-memory room session timer tracking
@@ -305,6 +305,57 @@ def verify_answer():
     return jsonify({
         "success": False,
         "message": "Incorrect answer. Demonic rune rejected!"
+    }), 200
+
+# ── LEVEL 3 DEMON LORD BOSS ATTACK ENDPOINT ───────────────────────────
+@app.route('/api/boss/attack', methods=['POST'])
+def process_boss_attack():
+    """Processes player hand gesture attack and calculates damage against Demon Lord."""
+    data = request.json or {}
+    player_role = data.get("playerRole", "player1")
+    gesture = data.get("gesture", "FIST").upper()
+    current_hp = data.get("currentHp", 500)
+    partner_gesture = data.get("partnerGesture")
+
+    DAMAGE_TABLE = {
+        "FIST": 45,    # Heavy Strike (Fireball / Holy Hammer)
+        "PALM": 25,    # Barrier Strike / Holy Aura
+        "PEACE": 35    # Arcane Blast / Light Surge
+    }
+
+    base_damage = DAMAGE_TABLE.get(gesture, 30)
+    is_combo = False
+    combo_bonus = 0
+
+    # If both players executed synergistic or matching gestures
+    if partner_gesture:
+        partner_g = str(partner_gesture).upper()
+        if partner_g == gesture:
+            is_combo = True
+            combo_bonus = 40  # Same gesture resonance combo!
+        elif {gesture, partner_g} == {"FIST", "PEACE"}:
+            is_combo = True
+            combo_bonus = 50  # Elemental Overload combo!
+
+    total_damage = base_damage + combo_bonus
+    new_hp = max(0, current_hp - total_damage)
+    is_defeated = (new_hp <= 0)
+
+    spell_name = "Inferno Strike" if gesture == "FIST" else "Shield Surge" if gesture == "PALM" else "Arcane Beam"
+    if player_role == "player2":
+        spell_name = "Holy Smite" if gesture == "FIST" else "Divine Protection" if gesture == "PALM" else "Sunfire Burst"
+
+    message = f"{player_role.upper()} cast {spell_name}! Dealt {total_damage} damage."
+    if is_combo:
+        message += " ✨ CRITICAL SYNERGY COMBO!"
+
+    return jsonify({
+        "success": True,
+        "damage": total_damage,
+        "newHp": new_hp,
+        "isDefeated": is_defeated,
+        "isCombo": is_combo,
+        "message": message
     }), 200
 
 if __name__ == '__main__':

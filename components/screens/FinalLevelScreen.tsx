@@ -1,329 +1,267 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { GameGameState, gameSync, ANCIENT_SEALS } from "@/lib/gameStore";
-import { pythonApi, FinalCrystalData, FALLBACK_FINAL_CRYSTALS } from "@/lib/pythonApi";
-import { puzzleService } from "@/lib/puzzleService";
-import { CheckCircle, AlertCircle, Zap, Lock, Clock, User } from "lucide-react";
+import { GameGameState, gameSync } from "@/lib/gameStore";
+import { pythonApi } from "@/lib/pythonApi";
+import { HandGestureDetector } from "@/components/ui/HandGestureDetector";
+import { Flame, Swords, Shield, HeartHandshake, Eye, Sparkles, AlertTriangle } from "lucide-react";
 
 interface FinalLevelScreenProps {
   state: GameGameState;
   myRole: 'player1' | 'player2';
 }
 
-const CRYSTAL_CONFIG = [
-  { id: 1, emoji: "🔥", name: "Inferno",  color: "from-red-900/50 to-red-950/70 border-red-700/50",    ring: "ring-red-500",    glow: "shadow-red-900/60" },
-  { id: 2, emoji: "👁️", name: "Shadow",   color: "from-purple-900/50 to-purple-950/70 border-purple-700/50", ring: "ring-purple-500", glow: "shadow-purple-900/60" },
-  { id: 3, emoji: "⚡", name: "Thunder",  color: "from-blue-900/50 to-blue-950/70 border-blue-700/50",  ring: "ring-blue-500",   glow: "shadow-blue-900/60" },
-  { id: 4, emoji: "💀", name: "Void",     color: "from-zinc-800/50 to-zinc-900/70 border-zinc-600/50",  ring: "ring-zinc-400",   glow: "shadow-zinc-800/60" },
-];
-
 export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRole }) => {
-  const assignedIds = myRole === 'player1' ? [1, 2] : [3, 4];
-  const [crystals, setCrystals] = useState<FinalCrystalData[]>(FALLBACK_FINAL_CRYSTALS);
-  const [activeCrystalId, setActiveCrystalId] = useState<number>(assignedIds[0]);
-  const [userAnswer, setUserAnswer] = useState('');
-  const [feedback, setFeedback] = useState<{ success?: boolean; message: string }>({ message: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [selectedSealId, setSelectedSealId] = useState<string | null>(null);
+  const [battleLogs, setBattleLogs] = useState<string[]>([
+    "⚔️ First-Person Arena Active! Defeat Malakor using your hand gestures!",
+  ]);
+  const [isAttacking, setIsAttacking] = useState(false);
+  const [bossHitEffect, setBossHitEffect] = useState(false);
+  const [floatingDamage, setFloatingDamage] = useState<{ amount: number; isCombo: boolean; id: number } | null>(null);
 
+  const demonHp = state.l3DemonHp ?? 500;
+  const maxHp = state.l3MaxDemonHp ?? 500;
+  const hpPercent = Math.max(0, Math.min(100, Math.round((demonHp / maxHp) * 100)));
+  const isL2Complete = state.currentLevel === 3 || state.l1IsCompleted;
+
+  // Stance shift simulation based on HP thresholds
   useEffect(() => {
-    puzzleService.getAssignedSetForTeam(3, state.teamCode).then((assignedCrystals) => {
-      if (Array.isArray(assignedCrystals) && assignedCrystals.length > 0) {
-        setCrystals(assignedCrystals);
-      }
-    });
-  }, [state.teamCode]);
+    let nextStance: 'idle' | 'charging' | 'vulnerable' | 'enraged' = 'idle';
+    if (demonHp < 150) {
+      nextStance = 'enraged';
+    } else if (demonHp % 120 < 40) {
+      nextStance = 'charging';
+    } else if (demonHp % 120 > 80) {
+      nextStance = 'vulnerable';
+    }
 
-  const destroyed = state.l3DestroyedCrystals;
-  const allDone = destroyed.length === 4;
-  const myDone = assignedIds.every((id) => destroyed.includes(id));
-  const partnerDone = assignedIds === assignedIds ? (myRole === 'player1' ? [3, 4].every(id => destroyed.includes(id)) : [1, 2].every(id => destroyed.includes(id))) : false;
-  const activeCrystal = crystals.find((c) => c.crystalId === activeCrystalId) || crystals[0];
-  const isL2Complete = state.currentLevel === 3 || state.l2UnlockedDoors?.length > 0;
+    if (state.l3DemonStance !== nextStance) {
+      gameSync.updateState({ l3DemonStance: nextStance });
+    }
+  }, [demonHp, state.l3DemonStance]);
 
-  // ── LOCKED (waiting for P2 to clear Level 2) ──────────────────────
+  // Execute Player Gesture Attack
+  const handleGestureDetected = async (gesture: 'FIST' | 'PALM' | 'PEACE') => {
+    if (isAttacking || demonHp <= 0) return;
+    setIsAttacking(true);
+    setBossHitEffect(true);
+    setTimeout(() => setBossHitEffect(false), 600);
+
+    const partnerGesture = myRole === 'player1' ? state.l3Player2Gesture : state.l3Player1Gesture;
+
+    const updateObj: Partial<GameGameState> = myRole === 'player1'
+      ? { l3Player1Gesture: gesture }
+      : { l3Player2Gesture: gesture };
+
+    gameSync.updateState(updateObj);
+
+    // Call Python backend or local API damage calculator
+    const result = await pythonApi.attackDemonLord(myRole, gesture, demonHp, partnerGesture);
+
+    // Trigger floating 1st-person damage text
+    setFloatingDamage({ amount: result.damage, isCombo: result.isCombo, id: Date.now() });
+    setTimeout(() => setFloatingDamage(null), 1200);
+
+    // Append to battle ticker
+    setBattleLogs((prev) => [result.message, ...prev.slice(0, 4)]);
+
+    const nextCombo = result.isCombo ? (state.l3ComboCount || 0) + 1 : state.l3ComboCount;
+
+    if (result.isDefeated) {
+      const level3DurationSec = state.level3Duration || 210;
+      const l3TimeSpent = Math.max(1, level3DurationSec - state.timeRemaining);
+
+      gameSync.updateState({
+        l3DemonHp: 0,
+        l3ComboCount: nextCombo,
+        l3TimeElapsed: l3TimeSpent,
+        currentLevel: 4,
+        gameStatus: 'victory',
+        isDemonSealed: true,
+      });
+    } else {
+      gameSync.updateState({
+        l3DemonHp: result.newHp,
+        l3ComboCount: nextCombo,
+      });
+    }
+
+    setIsAttacking(false);
+  };
+
   if (!isL2Complete) {
     return (
-      <div className="w-full max-w-lg mx-auto px-4 py-12 flex flex-col items-center gap-8">
+      <div className="w-full max-w-lg mx-auto px-4 py-12 flex flex-col items-center gap-8 text-center">
         <div className="w-20 h-20 rounded-full bg-amber-950/60 border-2 border-amber-500/50 flex items-center justify-center text-4xl animate-pulse">
           🔒
         </div>
-        <div className="text-center space-y-2">
-          <p className="text-xs font-mono tracking-widest text-amber-400 uppercase">Final Level · Locked</p>
-          <h2 className="text-2xl font-extrabold text-white font-serif">Waiting for Player 2</h2>
+        <div className="space-y-2">
+          <p className="text-xs font-mono tracking-widest text-amber-400 uppercase">Final Level 3 · Locked</p>
+          <h2 className="text-2xl font-extrabold text-white font-serif">Waiting for Partner</h2>
           <p className="text-sm text-zinc-400 leading-relaxed max-w-sm mx-auto">
-            Player 2 is navigating the Demon Doors. The Throne Room unlocks the moment they escape Level 2.
+            Your partner is clearing Level 2. The First-Person Throne Room unlocks when Level 2 is completed.
           </p>
         </div>
-        <div className="w-full bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2 text-emerald-400 font-mono">
-              <User className="w-4 h-4" /> {state.player1Name || 'Player 1'}
-            </div>
-            <span className="text-xs bg-emerald-900/60 border border-emerald-600/40 text-emerald-400 px-2.5 py-1 rounded-full font-mono font-bold">Level 1 ✓</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-6xl mx-auto px-2 py-4 space-y-4 font-sans">
+      {/* HUD Bar */}
+      <div className="flex items-center justify-between bg-zinc-950/90 border border-red-900/50 px-4 py-2.5 rounded-2xl shadow-xl">
+        <div className="flex items-center gap-2">
+          <Eye className="w-5 h-5 text-red-500 animate-pulse" />
+          <span className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-widest">
+            First-Person Battle View · Level 3
+          </span>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-xl text-xs font-mono">
+            <span className="text-zinc-400">Synergy:</span>
+            <span className="font-bold text-amber-400">🔥 x{state.l3ComboCount || 0}</span>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2 text-purple-400 font-mono">
-              <User className="w-4 h-4" /> {state.player2Name || 'Player 2'}
-            </div>
-            <span className="text-xs bg-purple-900/60 border border-purple-600/40 text-purple-400 px-2.5 py-1 rounded-full font-mono font-bold flex items-center gap-1">
-              <Clock className="w-3 h-3 animate-spin" style={{ animationDuration: '3s' }} /> In Level 2…
+
+          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-xl text-xs font-mono">
+            <span className="text-zinc-400">Time Left:</span>
+            <span className="font-bold text-cyan-400">
+              ⏱️ {Math.floor(state.timeRemaining / 60)}:{(state.timeRemaining % 60).toString().padStart(2, '0')}
             </span>
           </div>
         </div>
       </div>
-    );
-  }
 
-  // ── MY TASKS DONE, WAITING FOR PARTNER ────────────────────────────
-  if (myDone && !allDone) {
-    const partnerName = myRole === 'player1' ? (state.player2Name || 'Player 2') : (state.player1Name || 'Player 1');
-    return (
-      <div className="w-full max-w-lg mx-auto px-4 py-12 flex flex-col items-center gap-8">
-        <div className="w-20 h-20 rounded-full bg-emerald-950/60 border-2 border-emerald-500/50 flex items-center justify-center text-4xl">
-          ✅
-        </div>
-        <div className="text-center space-y-2">
-          <p className="text-xs font-mono tracking-widest text-emerald-400 uppercase">Your tasks complete!</p>
-          <h2 className="text-2xl font-extrabold text-white font-serif">Waiting for {partnerName}</h2>
-          <p className="text-sm text-zinc-400 leading-relaxed">
-            You've shattered your 2 crystals. Hold on while your partner finishes theirs!
-          </p>
-        </div>
-        {/* Crystal status overview */}
-        <div className="grid grid-cols-4 gap-3 w-full">
-          {CRYSTAL_CONFIG.map((cfg) => {
-            const done = destroyed.includes(cfg.id);
-            const mine = assignedIds.includes(cfg.id);
-            return (
-              <div key={cfg.id} className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all ${done ? 'bg-emerald-950/40 border-emerald-600/40' : 'bg-zinc-900/60 border-zinc-800'}`}>
-                <span className="text-xl">{done ? '✅' : cfg.emoji}</span>
-                <span className={`text-[10px] font-mono font-bold ${mine ? 'text-amber-400' : 'text-zinc-500'}`}>
-                  {mine ? 'Mine' : 'Partner'}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 animate-pulse">
-          <Clock className="w-3.5 h-3.5" /> Timer still running — {partnerName} is working on it…
-        </div>
-      </div>
-    );
-  }
+      {/* FIRST PERSON PERSPECTIVE ARENA */}
+      <div className={`relative w-full h-[380px] sm:h-[420px] bg-gradient-to-b from-black via-red-950/60 to-zinc-950 border-2 rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 flex flex-col items-center justify-between p-4 ${
+        bossHitEffect ? 'border-red-500 ring-8 ring-red-500/40 scale-[0.99]' : 'border-red-900/60'
+      }`}>
+        {/* Dungeon Room Background FX */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-red-900/30 via-transparent to-transparent pointer-events-none" />
 
-  // ── SEAL SELECTION (all 4 destroyed) ──────────────────────────────
-  if (allDone) {
-    const handleSeal = () => {
-      if (!selectedSealId) return;
-      const seal = ANCIENT_SEALS.find(s => s.id === selectedSealId);
-      if (!seal?.isCorrect) {
-        setFeedback({ success: false, message: `${seal?.name} rejected! −30s penalty.` });
-        gameSync.updateState(prev => ({ ...prev, timeRemaining: Math.max(1, prev.timeRemaining - 30), timePenalties: prev.timePenalties + 30 }));
-        return;
-      }
-      gameSync.updateState({ selectedSeal: selectedSealId, isDemonSealed: true, currentLevel: 4, gameStatus: 'victory' });
-    };
-
-    return (
-      <div className="w-full max-w-xl mx-auto px-4 py-8 space-y-8">
-        <div className="text-center space-y-2">
-          <div className="text-4xl animate-bounce">✨</div>
-          <p className="text-xs font-mono tracking-widest text-amber-400 uppercase">All Crystals Shattered!</p>
-          <h2 className="text-2xl font-extrabold text-white font-serif">Choose the Ancient Seal</h2>
-          <p className="text-sm text-zinc-400">One seal binds the Demon Lord forever. Choose wisely.</p>
-        </div>
-
-        {feedback.message && (
-          <div className="flex items-center gap-3 bg-red-950/60 border border-red-700/40 text-red-300 rounded-xl px-4 py-3 text-sm font-mono">
-            <AlertCircle className="w-4 h-4 shrink-0" /> {feedback.message}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-3">
-          {ANCIENT_SEALS.map((seal) => (
-            <button
-              key={seal.id}
-              onClick={() => setSelectedSealId(seal.id)}
-              className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer ${
-                selectedSealId === seal.id
-                  ? 'bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/30'
-                  : 'bg-zinc-900/70 border-zinc-800 hover:border-zinc-600'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-white">{seal.name}</span>
-                {selectedSealId === seal.id && <CheckCircle className="w-4 h-4 text-amber-400" />}
-              </div>
-              <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{seal.description}</p>
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={handleSeal}
-          disabled={!selectedSealId}
-          className="w-full py-4 rounded-2xl bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-black font-extrabold font-mono text-base transition-all cursor-pointer"
-        >
-          🔐 Execute Binding Seal
-        </button>
-      </div>
-    );
-  }
-
-  // ── ACTIVE CRYSTAL PHASE ──────────────────────────────────────────
-  const handleShatter = async (overrideAnswer?: string) => {
-    const answer = overrideAnswer || userAnswer;
-    if (!answer.trim()) return;
-    if (!assignedIds.includes(activeCrystalId)) {
-      setFeedback({ success: false, message: "That crystal belongs to your partner!" });
-      return;
-    }
-    setSubmitting(true);
-    const result = await pythonApi.verifyAnswer(activeCrystal.puzzle.id, answer);
-    setFeedback(result);
-    setSubmitting(false);
-    if (result.success) {
-      const updated = Array.from(new Set([...destroyed, activeCrystalId]));
-      if (updated.length === 4) {
-        gameSync.updateState({ l3DestroyedCrystals: updated, collectedSealFragments: 4, selectedSeal: 'CELESTIAL', isDemonSealed: true, currentLevel: 4, gameStatus: 'victory' });
-      } else {
-        gameSync.updateState({ l3DestroyedCrystals: updated, collectedSealFragments: updated.length });
-        const next = assignedIds.find(id => !updated.includes(id));
-        if (next) { setActiveCrystalId(next); setUserAnswer(''); setFeedback({ message: '' }); }
-      }
-    }
-  };
-
-  const cfg = CRYSTAL_CONFIG.find(c => c.id === activeCrystalId)!;
-  const isMine = assignedIds.includes(activeCrystalId);
-  const isDone = destroyed.includes(activeCrystalId);
-
-  return (
-    <div className="w-full max-w-xl mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
-      <div className="text-center space-y-1">
-        <p className="text-xs font-mono tracking-widest text-red-400 uppercase">Level 3 · Throne Room</p>
-        <h2 className="text-2xl font-extrabold text-white font-serif">Shatter Your Crystals</h2>
-        <p className="text-xs text-zinc-400 font-mono">
-          You: <strong className="text-amber-400">Crystals {assignedIds.join(' & ')}</strong> · Partner: <strong className="text-purple-400">Crystals {(myRole === 'player1' ? [3,4] : [1,2]).join(' & ')}</strong>
-        </p>
-      </div>
-
-      {/* Crystal progress dots */}
-      <div className="flex items-center justify-center gap-3">
-        {CRYSTAL_CONFIG.map((c) => {
-          const done = destroyed.includes(c.id);
-          const mine = assignedIds.includes(c.id);
-          const active = activeCrystalId === c.id;
-          return (
-            <button
-              key={c.id}
-              onClick={() => { setActiveCrystalId(c.id); setUserAnswer(''); setFeedback({ message: '' }); }}
-              className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border transition-all ${
-                done
-                  ? 'bg-emerald-950/40 border-emerald-600/40 opacity-80'
-                  : active
-                  ? `bg-gradient-to-br ${c.color} ${c.ring} ring-2`
-                  : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-600'
-              } ${mine ? 'cursor-pointer' : 'cursor-default opacity-60'}`}
-            >
-              <span className="text-xl">{done ? '✅' : c.emoji}</span>
-              <span className={`text-[9px] font-mono font-bold ${mine ? 'text-amber-400' : 'text-zinc-500'}`}>
-                {done ? 'Done' : mine ? 'Mine' : 'Theirs'}
+        {/* TOP CENTER: OPPOSING DEMON LORD (MALAKOR) IN 1ST PERSON VIEW */}
+        <div className="relative z-10 flex flex-col items-center text-center space-y-2 mt-2">
+          {/* Boss HP Bar */}
+          <div className="w-72 sm:w-96 space-y-1 bg-black/80 border border-red-900/80 p-2.5 rounded-2xl shadow-2xl backdrop-blur-md">
+            <div className="flex justify-between text-xs font-mono font-bold">
+              <span className="text-red-400 flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 fill-red-500" /> MALAKOR, DEMON LORD
               </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active crystal card */}
-      <div className={`bg-gradient-to-br ${cfg.color} rounded-2xl border p-6 shadow-xl ${cfg.glow} space-y-5`}>
-        <div className="flex items-center gap-3">
-          <span className="text-4xl">{cfg.emoji}</span>
-          <div>
-            <p className="text-xs font-mono text-zinc-400 uppercase tracking-wider">{isMine ? '⚡ Your task' : '🔒 Partner\'s task'}</p>
-            <h3 className="text-xl font-extrabold text-white">{activeCrystal.name}</h3>
-          </div>
-          {isDone && <span className="ml-auto text-emerald-400 text-2xl">✅</span>}
-          {!isMine && !isDone && <Lock className="ml-auto w-5 h-5 text-zinc-500" />}
-        </div>
-
-        {isMine && !isDone && (
-          <div className="space-y-4">
-            <div className="bg-black/30 rounded-xl p-4 space-y-2">
-              <p className="text-xs font-mono text-amber-400 font-bold">{activeCrystal.puzzle.title}</p>
-              <p className="text-sm text-zinc-300 leading-relaxed">{activeCrystal.puzzle.description}</p>
-              {activeCrystal.puzzle.initialCode && (
-                <pre className="bg-black/60 rounded-lg p-3 text-xs font-mono text-emerald-400 overflow-x-auto mt-2">
-                  {activeCrystal.puzzle.initialCode}
-                </pre>
-              )}
+              <span className="text-zinc-200">{demonHp} / {maxHp} HP</span>
             </div>
 
-            {activeCrystal.puzzle.options ? (
-              <div className="grid grid-cols-2 gap-2">
-                {activeCrystal.puzzle.options.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => { setUserAnswer(opt); handleShatter(opt); }}
-                    disabled={submitting}
-                    className={`py-3 px-4 rounded-xl text-sm font-mono font-bold border transition-all cursor-pointer ${
-                      userAnswer === opt ? 'bg-red-700 border-red-500 text-white' : 'bg-black/30 border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                    } ${submitting ? 'opacity-60 cursor-wait' : ''}`}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={userAnswer}
-                  onChange={(e) => setUserAnswer(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleShatter()}
-                  placeholder="Your answer..."
-                  className="w-full bg-black/40 border border-zinc-700 focus:border-red-500 text-white font-mono text-sm px-4 py-3 rounded-xl outline-none transition-colors placeholder:text-zinc-600"
-                />
-                <button
-                  onClick={() => handleShatter()}
-                  disabled={submitting || !userAnswer.trim()}
-                  className="w-full py-3 rounded-xl bg-red-700 hover:bg-red-600 disabled:opacity-40 text-white font-mono font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Zap className="w-4 h-4" /> {submitting ? 'Checking...' : `Shatter Crystal`}
-                </button>
-              </div>
-            )}
+            <div className="w-full h-4 bg-zinc-950 border border-zinc-800 rounded-full overflow-hidden p-0.5">
+              <div
+                className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${
+                  hpPercent > 50 ? 'from-red-600 to-amber-500' : hpPercent > 20 ? 'from-amber-600 to-red-600' : 'from-purple-700 to-red-700 animate-pulse'
+                }`}
+                style={{ width: `${hpPercent}%` }}
+              />
+            </div>
+          </div>
 
-            {feedback.message && (
-              <div className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-mono border ${
-                feedback.success
-                  ? 'bg-emerald-950/60 border-emerald-600/40 text-emerald-300'
-                  : 'bg-red-950/60 border-red-700/40 text-red-300'
-              }`}>
-                {feedback.success ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                {feedback.message}
+          {/* Dynamic Stance Alert */}
+          {state.l3DemonStance === 'charging' && (
+            <div className="bg-amber-500/90 text-black px-3 py-1 rounded-full text-xs font-mono font-extrabold flex items-center gap-1 shadow-lg animate-bounce">
+              <AlertTriangle className="w-3.5 h-3.5" /> CHARGING HELLFIRE! CAST ✋ AEGIS SHIELD!
+            </div>
+          )}
+          {state.l3DemonStance === 'vulnerable' && (
+            <div className="bg-emerald-500/90 text-black px-3 py-1 rounded-full text-xs font-mono font-extrabold flex items-center gap-1 shadow-lg animate-bounce">
+              <Sparkles className="w-3.5 h-3.5" /> EXPOSED! EXECUTE ✊ FIST OR ✌️ V-SIGN!
+            </div>
+          )}
+
+          {/* Giant Demon Avatar Directly Opposite the Players */}
+          <div className="relative my-2">
+            <div className={`w-36 h-36 sm:w-44 sm:h-44 rounded-full bg-gradient-to-b from-red-950 to-black border-4 border-red-600 flex items-center justify-center text-7xl sm:text-8xl shadow-2xl shadow-red-900/90 transition-transform ${
+              bossHitEffect ? 'scale-110 rotate-6 filter brightness-150' : 'animate-pulse'
+            }`}>
+              👹
+            </div>
+
+            {/* 1st-Person Floating Damage Number Effect */}
+            {floatingDamage && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-4xl font-extrabold font-mono text-amber-300 drop-shadow-[0_5px_5px_rgba(255,0,0,0.8)] animate-ping pointer-events-none">
+                -{floatingDamage.amount} HP {floatingDamage.isCombo && '💥 CRITICAL!'}
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {!isMine && !isDone && (
-          <p className="text-sm text-zinc-500 font-mono text-center">
-            This crystal belongs to your partner. Focus on yours!
-          </p>
-        )}
+        {/* BOTTOM FIELD: FIRST PERSON PLAYER POV SPELLCASTING PROJECTILES */}
+        <div className="relative z-10 w-full flex items-end justify-between px-6 pb-2">
+          {/* Player 1 Left POV Hand */}
+          <div className="flex items-center gap-2 bg-black/70 border border-zinc-800 px-3 py-1.5 rounded-xl text-xs font-mono">
+            <span className="text-2xl">🧙‍♂️</span>
+            <div>
+              <span className="text-zinc-400 block text-[10px]">P1 Mage ({state.player1Name || 'P1'})</span>
+              <span className="text-amber-400 font-bold">
+                {state.l3Player1Gesture ? `Cast ${state.l3Player1Gesture}` : 'Ready...'}
+              </span>
+            </div>
+          </div>
 
-        {isDone && (
-          <p className="text-sm text-emerald-400 font-mono text-center">Crystal shattered! Fragment collected ✓</p>
-        )}
+          {/* Center Battle Ticker */}
+          <div className="hidden sm:block text-center max-w-sm bg-black/80 border border-zinc-800 px-4 py-1.5 rounded-xl text-[11px] font-mono text-zinc-300 truncate">
+            {battleLogs[0] || 'Perform hand gestures to attack Malakor directly!'}
+          </div>
+
+          {/* Player 2 Right POV Hand */}
+          <div className="flex items-center gap-2 bg-black/70 border border-zinc-800 px-3 py-1.5 rounded-xl text-xs font-mono">
+            <div>
+              <span className="text-zinc-400 block text-[10px] text-right">P2 Paladin ({state.player2Name || 'P2'})</span>
+              <span className="text-amber-400 font-bold block text-right">
+                {state.l3Player2Gesture ? `Cast ${state.l3Player2Gesture}` : 'Ready...'}
+              </span>
+            </div>
+            <span className="text-2xl">🛡️</span>
+          </div>
+        </div>
       </div>
 
-      {/* Mini overall progress */}
-      <div className="text-center text-xs text-zinc-500 font-mono">
-        {destroyed.length}/4 crystals shattered · {4 - destroyed.length} remaining
+      {/* DUAL PLAYER GESTURE CONTROLS & FEEDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Active Player Gesture Camera & Cards */}
+        <HandGestureDetector
+          playerRole={myRole}
+          onGestureDetected={handleGestureDetected}
+          disabled={isAttacking || demonHp <= 0}
+        />
+
+        {/* Partner Info & Battle Ticker */}
+        <div className="bg-zinc-950/90 border border-zinc-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+              <div className="flex items-center gap-2">
+                <HeartHandshake className="w-4 h-4 text-emerald-400" />
+                <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">
+                  Partner ({myRole === 'player1' ? (state.player2Name || 'Player 2') : (state.player1Name || 'Player 1')})
+                </h4>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded text-xs font-mono text-amber-400 font-bold">
+                Last: {myRole === 'player1' ? (state.l3Player2Gesture || 'None') : (state.l3Player1Gesture || 'None')}
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-400 font-mono leading-relaxed">
+              Facing Malakor in First Person! Execute hand gestures simultaneously to land <strong className="text-amber-400">Team Synergy Combos</strong>!
+            </p>
+          </div>
+
+          {/* Live Battle Log */}
+          <div className="bg-black/80 border border-zinc-800 rounded-xl p-3 space-y-1 font-mono text-xs max-h-32 overflow-y-auto">
+            <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold block border-b border-zinc-800 pb-1">
+              Live Battle Log
+            </span>
+            {battleLogs.map((log, i) => (
+              <div key={i} className={`text-[11px] leading-tight ${i === 0 ? 'text-amber-300 font-bold' : 'text-zinc-400'}`}>
+                {log}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

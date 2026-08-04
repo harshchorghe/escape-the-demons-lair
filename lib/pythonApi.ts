@@ -352,6 +352,66 @@ export class PythonApiService {
 
     return { success: true, message: "Accepted." };
   }
+
+  public async attackDemonLord(
+    playerRole: 'player1' | 'player2',
+    gesture: 'FIST' | 'PALM' | 'PEACE',
+    currentHp: number,
+    partnerGesture?: 'FIST' | 'PALM' | 'PEACE' | null
+  ): Promise<{ success: boolean; damage: number; newHp: number; isDefeated: boolean; isCombo: boolean; message: string }> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/boss/attack`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerRole, gesture, currentHp, partnerGesture }),
+        signal: AbortSignal.timeout(600)
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Offline fallback
+    }
+
+    // Local damage calculation fallback
+    const DAMAGE_TABLE = { FIST: 45, PALM: 25, PEACE: 35 };
+    const baseDamage = DAMAGE_TABLE[gesture] || 30;
+    let isCombo = false;
+    let comboBonus = 0;
+
+    if (partnerGesture) {
+      if (partnerGesture === gesture) {
+        isCombo = true;
+        comboBonus = 40;
+      } else if (
+        (gesture === 'FIST' && partnerGesture === 'PEACE') ||
+        (gesture === 'PEACE' && partnerGesture === 'FIST')
+      ) {
+        isCombo = true;
+        comboBonus = 50;
+      }
+    }
+
+    const totalDamage = baseDamage + comboBonus;
+    const newHp = Math.max(0, currentHp - totalDamage);
+    const isDefeated = newHp <= 0;
+
+    const spellName = playerRole === 'player1'
+      ? (gesture === 'FIST' ? 'Inferno Strike ✊' : gesture === 'PALM' ? 'Aegis Shield ✋' : 'Arcane Blast ✌️')
+      : (gesture === 'FIST' ? 'Holy Smite ✊' : gesture === 'PALM' ? 'Divine Barrier ✋' : 'Light Surge ✌️');
+
+    let message = `${playerRole.toUpperCase()} cast ${spellName}! Dealt ${totalDamage} damage.`;
+    if (isCombo) message += ' ✨ CRITICAL SYNERGY COMBO!';
+
+    return {
+      success: true,
+      damage: totalDamage,
+      newHp,
+      isDefeated,
+      isCombo,
+      message
+    };
+  }
 }
 
 export const pythonApi = new PythonApiService();

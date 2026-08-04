@@ -80,13 +80,13 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
           <Trophy className="w-10 h-10" />
         </div>
         <div className="inline-flex items-center gap-2 bg-emerald-950/80 border border-emerald-500/50 px-4 py-1.5 rounded-full text-emerald-300 font-mono text-xs uppercase tracking-widest">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" /> Mission Complete • Demon Lord Sealed!
+          <ShieldCheck className="w-4 h-4 text-emerald-400" /> Mission Complete • Demon Lord Defeated!
         </div>
         <h1 className="text-4xl md:text-5xl font-extrabold text-white font-serif tracking-tight">
           Escaped the Demon's Lair!
         </h1>
         <p className="text-sm text-zinc-400 max-w-lg mx-auto">
-          Through perfect cooperation, coding mastery, and cipher breaking, your team defeated the darkness.
+          Through perfect co-op hand gesture spellcasting, code mastery, and team synergy, your team vanquished Malakor!
         </p>
       </div>
 
