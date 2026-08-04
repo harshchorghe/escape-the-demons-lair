@@ -112,16 +112,16 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   useEffect(() => { controlModeRef.current = controlMode; }, [controlMode]);
   useEffect(() => { isCameraEnabledRef.current = isCameraEnabled; }, [isCameraEnabled]);
 
-  // Constants
+  // Constants (Easier & Forgiving Difficulty Settings)
   const CANVAS_WIDTH = 400;
   const CANVAS_HEIGHT = 520;
   const GROUND_HEIGHT = 70;
-  const GRAVITY = 0.32;
-  const JUMP_STRENGTH = -6.2;
-  const MAX_FALL_SPEED = 9;
-  const PIPE_SPEED = 2;
-  const PIPE_SPAWN_INTERVAL = 110; // Frames
-  const PIPE_GAP = 145; // Pixel gap for bird to fly through
+  const GRAVITY = 0.24; // Gentler gravity
+  const JUMP_STRENGTH = -5.2; // Smooth controllable lift
+  const MAX_FALL_SPEED = 7; // Slower max fall rate
+  const PIPE_SPEED = 1.5; // Relaxed scrolling speed
+  const PIPE_SPAWN_INTERVAL = 160; // Farther horizontal gap between pillar pairs
+  const PIPE_GAP = 200; // Extra wide vertical gap for easy passage
 
   // Handle high score load from local storage
   useEffect(() => {
@@ -238,10 +238,10 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   // Ref to always hold the latest triggerJump function
   const triggerJumpRef = useRef<() => void>(() => {});
 
-  // Hand Detection Loop (runs in requestAnimationFrame for real-time tracking)
-  // Uses refs instead of state to avoid stale closures
-  const prevHandPosRef = useRef<{ y: number; x: number; time: number } | null>(null);
-  const prevDistanceRef = useRef<number | null>(null);
+  // Hand Detection Loop (Pinch & Fist-Pump Gesture Recognition)
+  // Uses refs to avoid stale closures inside requestAnimationFrame
+  const isPinchedRef = useRef(false);
+  const isFistClosedRef = useRef(false);
 
   const startHandDetection = () => {
     let lastTimestamp = 0;
@@ -266,66 +266,68 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
       let triggered = false;
 
       if (results.landmarks && results.landmarks.length > 0) {
-        // --- 1. Two-Hand Ultra-Fast Clap Detection ---
-        if (results.landmarks.length >= 2) {
-          const hand1 = results.landmarks[0][9]; // Palm center (MIDDLE_FINGER_MCP)
-          const hand2 = results.landmarks[1][9];
-          const dx = hand1.x - hand2.x;
-          const dy = hand1.y - hand2.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+        // Use primary hand (first detected hand)
+        const hand = results.landmarks[0];
 
-          // Fast Clap Detection Trigger:
-          // A) Hands are close together (< 0.28 normalized distance)
-          // B) Rapid distance drop (hands coming together fast)
-          // C) Hands moving apart after touching
-          if (distance < 0.28) {
-            triggered = true;
-          } else if (prevDistanceRef.current !== null) {
-            const distanceDelta = prevDistanceRef.current - distance; // Positive if hands moving closer
-            if (distanceDelta > 0.04) {
-              // Rapid clap motion detected in flight!
-              triggered = true;
-            }
-          }
+        const wrist = hand[0];
+        const thumbTip = hand[4];
+        const indexTip = hand[8];
+        const middleTip = hand[12];
+        const ringTip = hand[16];
+        const pinkyTip = hand[20];
 
-          prevDistanceRef.current = distance;
-        } else {
-          prevDistanceRef.current = null;
+        // --- 1. Thumb-to-Index Pinch Detection ---
+        const dxPinch = thumbTip.x - indexTip.x;
+        const dyPinch = thumbTip.y - indexTip.y;
+        const pinchDist = Math.sqrt(dxPinch * dxPinch + dyPinch * dyPinch);
+
+        const PINCH_CLOSE = 0.06; // Fingers pinched together
+        const PINCH_OPEN = 0.10;  // Fingers released
+
+        if (pinchDist < PINCH_CLOSE) {
+          isPinchedRef.current = true;
+        } else if (pinchDist > PINCH_OPEN && isPinchedRef.current) {
+          isPinchedRef.current = false;
+          triggered = true; // Pinch-and-release triggers flap!
         }
 
-        // --- 2. Single-Hand Fast Motion & Velocity Spike Fallback ---
-        if (!triggered && results.landmarks[0]) {
-          const primaryPalm = results.landmarks[0][9]; // Palm center
-          const wrist = results.landmarks[0][0]; // Wrist
+        // --- 2. Open-Palm to Closed-Fist Pump Detection ---
+        const distIndex = Math.sqrt((indexTip.x - wrist.x) ** 2 + (indexTip.y - wrist.y) ** 2);
+        const distMiddle = Math.sqrt((middleTip.x - wrist.x) ** 2 + (middleTip.y - wrist.y) ** 2);
+        const distRing = Math.sqrt((ringTip.x - wrist.x) ** 2 + (ringTip.y - wrist.y) ** 2);
+        const distPinky = Math.sqrt((pinkyTip.x - wrist.x) ** 2 + (pinkyTip.y - wrist.y) ** 2);
+        const avgFingerExtension = (distIndex + distMiddle + distRing + distPinky) / 4;
 
-          if (prevHandPosRef.current) {
-            const dt = currentTime - prevHandPosRef.current.time;
-            const deltaY = prevHandPosRef.current.y - primaryPalm.y; // Positive = UP
-            const deltaX = Math.abs(primaryPalm.x - prevHandPosRef.current.x);
-            const speed = Math.sqrt(deltaY * deltaY + deltaX * deltaX);
+        const FIST_CLOSED = 0.20; // Closed fist (fingers curled in toward wrist)
+        const FIST_OPEN = 0.32;   // Open palm
 
-            // Trigger on any fast upward jerk OR rapid hand gesture spike (> 0.04 in < 150ms)
-            if (dt > 0 && dt < 150 && (deltaY > 0.035 || speed > 0.05)) {
-              triggered = true;
-            }
+        if (avgFingerExtension < FIST_CLOSED) {
+          if (!isFistClosedRef.current) {
+            isFistClosedRef.current = true;
+            triggered = true; // Fist clench triggers flap!
           }
-          prevHandPosRef.current = { y: primaryPalm.y, x: primaryPalm.x, time: currentTime };
+        } else if (avgFingerExtension > FIST_OPEN) {
+          if (isFistClosedRef.current) {
+            isFistClosedRef.current = false;
+            triggered = true; // Fist open triggers flap!
+          }
         }
 
-        // --- 3. Execute Jump if Triggered ---
+        // --- 3. Trigger Flap & Cooldown ---
         if (triggered && controlModeRef.current === 'gesture') {
-          if (currentTime - lastJumpTimeRef.current > 60) { // 60ms ultra-fast cooldown for high speed clapping
+          if (currentTime - lastJumpTimeRef.current > 180) { // 180ms cooldown for snappy gesture control
             lastJumpTimeRef.current = currentTime;
             triggerJumpRef.current();
 
             // Flash visual feedback
             setGestureDetected(true);
             if (gestureFlashTimerRef.current) clearTimeout(gestureFlashTimerRef.current);
-            gestureFlashTimerRef.current = setTimeout(() => setGestureDetected(false), 250);
+            gestureFlashTimerRef.current = setTimeout(() => setGestureDetected(false), 300);
           }
         }
       } else {
-        prevDistanceRef.current = null;
+        isPinchedRef.current = false;
+        isFistClosedRef.current = false;
       }
 
       handDetectionLoopRef.current = requestAnimationFrame(detectFrame);
@@ -575,25 +577,27 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           const pipe = pipesRef.current[i];
           pipe.x -= PIPE_SPEED;
 
-          // Check score pass
+          // Check score pass (Unlimited scoring synced to Firebase!)
           if (!pipe.passed && pipe.x + pipe.width / 2 < bird.x) {
             pipe.passed = true;
             scoreRef.current += 1;
-            setScore(scoreRef.current);
-            updateHighScore(scoreRef.current);
-            
-            // Check victory condition
-            if (scoreRef.current >= targetScore) {
-              triggerVictory();
-            }
+            const newScore = scoreRef.current;
+            setScore(newScore);
+            updateHighScore(newScore);
+
+            // Sync score to Firebase Firestore state in real-time
+            gameSync.updateState((prev) => ({
+              ...prev,
+              l2Score: Math.max(prev.l2Score || 0, newScore),
+            }));
           }
 
-          // Check collision
+          // Check collision (forgiving hitbox)
           const birdBox = {
-            left: bird.x - bird.radius + 2,
-            right: bird.x + bird.radius - 2,
-            top: bird.y - bird.radius + 2,
-            bottom: bird.y + bird.radius - 2,
+            left: bird.x - bird.radius + 5,
+            right: bird.x + bird.radius - 5,
+            top: bird.y - bird.radius + 5,
+            bottom: bird.y + bird.radius - 5,
           };
 
           const topPipeBox = {
@@ -931,7 +935,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
         </h2>
         <p className="text-sm text-zinc-400 max-w-lg mx-auto">
           The Exit Portal is locked. Navigate the Phoenix through the toxic pillars to escape. 
-          Clap your hands in front of the camera to fly!
+          Make a fist or pinch your fingers in front of the camera to fly!
         </p>
       </div>
 
@@ -959,7 +963,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
             {/* Score HUD overlays */}
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-xl text-white font-mono text-sm shadow">
               <Trophy className="w-4 h-4 text-yellow-400" />
-              <span>Score: <strong className="text-yellow-400 font-bold">{score}</strong> / {targetScore}</span>
+              <span>Score: <strong className="text-yellow-400 font-bold">{score}</strong></span>
             </div>
 
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-xl text-zinc-300 font-mono text-sm shadow">
@@ -987,7 +991,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                       {countdown === 0 ? 'GO!' : countdown}
                     </span>
                   </div>
-                  <p className="text-sm text-zinc-400">Prepare to <span className="text-yellow-400 font-bold">{controlMode === 'gesture' ? 'clap your hands' : 'press space'}</span>!</p>
+                  <p className="text-sm text-zinc-400">Prepare to <span className="text-yellow-400 font-bold">{controlMode === 'gesture' ? 'clench fist or pinch' : 'press space'}</span>!</p>
                 </div>
               </div>
             )}
@@ -1004,13 +1008,22 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                       <h3 className="text-2xl font-extrabold text-red-500 uppercase tracking-wider animate-pulse">Crashed!</h3>
                       <p className="text-sm text-zinc-300 font-sans">Demonic traps triggered a <span className="text-red-400 font-bold">-15s</span> penalty!</p>
                     </div>
-                    <button
-                      onClick={initiateCountdown}
-                      className="px-6 py-3 bg-red-700 hover:bg-red-600 border-2 border-red-500 text-white rounded-xl font-bold flex items-center gap-2 mx-auto active:scale-95 transition-all shadow-lg shadow-red-900/40 cursor-pointer"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      Try Again
-                    </button>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={initiateCountdown}
+                        className="px-5 py-3 bg-red-700 hover:bg-red-600 border-2 border-red-500 text-white rounded-xl font-bold flex items-center gap-2 active:scale-95 transition-all shadow-lg shadow-red-900/40 cursor-pointer text-xs"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Try Again
+                      </button>
+                      <button
+                        onClick={triggerVictory}
+                        className="px-5 py-3 bg-purple-700 hover:bg-purple-600 border-2 border-purple-500 text-white rounded-xl font-bold flex items-center gap-2 active:scale-95 transition-all shadow-lg shadow-purple-900/40 cursor-pointer text-xs"
+                      >
+                        <Play className="w-4 h-4" />
+                        Proceed to Level 3
+                      </button>
+                    </div>
                   </div>
                 )}
                 
@@ -1020,8 +1033,8 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                       <Award className="w-8 h-8 text-emerald-400" />
                     </div>
                     <div className="space-y-2">
-                      <h3 className="text-2xl font-extrabold text-emerald-400 uppercase tracking-wider">Victory!</h3>
-                      <p className="text-sm text-zinc-300 font-sans">You scored {targetScore} points and escaped!</p>
+                      <h3 className="text-2xl font-extrabold text-emerald-400 uppercase tracking-wider">Level 2 Complete!</h3>
+                      <p className="text-sm text-zinc-300 font-sans">Total Score Recorded: <strong className="text-yellow-400 font-bold">{score} points</strong>!</p>
                     </div>
                     <div className="text-xs text-zinc-500 font-mono animate-pulse">Opening portal to Level 3...</div>
                   </div>
@@ -1035,16 +1048,26 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                     <div className="space-y-2">
                       <h3 className="text-2xl font-extrabold text-yellow-400 uppercase tracking-wider">Demonic Cavern</h3>
                       <p className="text-xs text-zinc-300 max-w-[280px] leading-relaxed font-sans">
-                        Navigate the Phoenix through the toxic pillars to score <strong className="text-yellow-400">{targetScore} points</strong>.
+                        Fly through the toxic pillars to score <strong className="text-yellow-400">unlimited points</strong> for your team!
                       </p>
                     </div>
-                    <button
-                      onClick={initiateCountdown}
-                      className="px-8 py-3.5 bg-purple-700 hover:bg-purple-600 text-white border-2 border-purple-500 rounded-xl font-bold flex items-center gap-2 mx-auto active:scale-95 transition-all shadow-lg shadow-purple-900/40 cursor-pointer text-sm"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      Start Escape
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={initiateCountdown}
+                        className="px-8 py-3.5 bg-purple-700 hover:bg-purple-600 text-white border-2 border-purple-500 rounded-xl font-bold flex items-center justify-center gap-2 mx-auto active:scale-95 transition-all shadow-lg shadow-purple-900/40 cursor-pointer text-sm"
+                      >
+                        <Play className="w-4 h-4 fill-white" />
+                        Start Escape
+                      </button>
+                      {score > 0 && (
+                        <button
+                          onClick={triggerVictory}
+                          className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white border border-emerald-600 rounded-xl font-bold flex items-center justify-center gap-2 mx-auto active:scale-95 transition-all text-xs"
+                        >
+                          Save Score &amp; Go to Level 3
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1133,8 +1156,8 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
               </button>
             ) : (
               <div className="flex gap-2">
-                <div className="flex-1 text-center py-3 rounded-xl border border-emerald-800/50 bg-emerald-950/30 text-emerald-300 font-mono font-bold text-xs flex items-center justify-center gap-1.5">
-                  ⚡ High-Sensitivity: Clap fast or flick hands!
+                <div className="flex-1 text-center py-3 rounded-xl border border-purple-800/50 bg-purple-950/30 text-purple-200 font-mono font-bold text-xs flex items-center justify-center gap-1.5">
+                  ✊ Clench fist or pinch fingers to flap!
                 </div>
                 <button
                   onClick={disableCamera}
@@ -1173,13 +1196,13 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                 )}
                 {gestureDetected && (
                   <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-yellow-500/90 text-black text-xs font-mono font-bold px-3 py-1 rounded-full shadow-lg">
-                    👏 CLAP DETECTED!
+                    ✊ GESTURE DETECTED!
                   </div>
                 )}
               </div>
               <p className="text-[10px] text-zinc-600 font-mono text-center">
                 {isCameraEnabled
-                  ? 'Ultra-fast tracking active (60ms response)'
+                  ? 'Close fist or pinch thumb & index finger to flap'
                   : 'Enable camera to use hand gesture control'}
               </p>
             </div>

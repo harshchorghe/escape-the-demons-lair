@@ -22,6 +22,7 @@ export interface GameGameState {
   l1FailedRooms: number[];
   l1IsCompleted: boolean;
   l2UnlockedDoors: number[];
+  l2Score?: number;
   l3DestroyedCrystals: number[];
   collectedSealFragments: number;
   selectedSeal: string | null;
@@ -51,6 +52,7 @@ export const INITIAL_GAME_STATE: GameGameState = {
   l1FailedRooms: [],
   l1IsCompleted: false,
   l2UnlockedDoors: [],
+  l2Score: 0,
   l3DestroyedCrystals: [],
   collectedSealFragments: 0,
   selectedSeal: null,
