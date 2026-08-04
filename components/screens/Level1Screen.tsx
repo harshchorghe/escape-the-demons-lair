@@ -256,9 +256,9 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
         {/* Options or text input */}
         {currentRoom.puzzle.options ? (
           <div className="grid grid-cols-2 gap-2">
-            {currentRoom.puzzle.options.map((opt) => (
+            {currentRoom.puzzle.options.map((opt, idx) => (
               <button
-                key={opt}
+                key={`${idx}-${opt}`}
                 onClick={() => { setUserAnswer(opt); handleSubmit(opt); }}
                 disabled={submitting}
                 className={`py-3 px-4 rounded-xl text-sm font-mono font-bold border transition-all cursor-pointer ${
