@@ -33,8 +33,8 @@ export default function Level1Page() {
         router.replace('/');
       }
 
-      // Redirect to Level 3 when Level 1 is completed or level advances
-      if (state.gameStatus === 'playing' && (state.currentLevel === 3 || state.l1IsCompleted)) {
+      // Redirect to Level 3 when Player 2 completes Level 2 (currentLevel advances to 3)
+      if (state.gameStatus === 'playing' && state.currentLevel === 3) {
         router.replace('/level3');
       }
     });

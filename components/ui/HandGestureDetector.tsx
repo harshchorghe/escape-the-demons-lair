@@ -183,7 +183,13 @@ export const HandGestureDetector: React.FC<HandGestureDetectorProps> = ({
       }
 
       videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      try {
+        await videoRef.current.play();
+      } catch (playErr: any) {
+        if (playErr.name !== 'AbortError') {
+          console.error("Camera play error:", playErr);
+        }
+      }
 
       const hands = new (window as any).Hands({
         locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
