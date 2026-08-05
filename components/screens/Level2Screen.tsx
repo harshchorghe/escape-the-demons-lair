@@ -674,103 +674,198 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
         ctx.fill();
       }
 
-      // Draw Parallax City Skyline at bottom
-      ctx.fillStyle = '#0f172a'; // Slate-900 silhouette
+      // Draw Distant Mountain & Mist Silhouette
+      const bgX = bgScrollXRef.current * 0.4;
+      for (let offset = 0; offset <= 1; offset++) {
+        const mx = (bgX + offset * CANVAS_WIDTH) % (CANVAS_WIDTH * 2);
+        // Distant soft blue mountain curve
+        ctx.fillStyle = 'rgba(71, 85, 105, 0.35)'; // Slate mist mountain
+        ctx.beginPath();
+        ctx.moveTo(mx - 40, CANVAS_HEIGHT - GROUND_HEIGHT);
+        ctx.quadraticCurveTo(mx + 80, CANVAS_HEIGHT - GROUND_HEIGHT - 90, mx + 200, CANVAS_HEIGHT - GROUND_HEIGHT);
+        ctx.quadraticCurveTo(mx + 300, CANVAS_HEIGHT - GROUND_HEIGHT - 120, mx + 440, CANVAS_HEIGHT - GROUND_HEIGHT);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Draw Parallax Japanese Pagodas Architecture Skyline at bottom
       const skylineX = skylineScrollXRef.current;
       for (let offset = 0; offset <= 1; offset++) {
         const sx = skylineX + offset * CANVAS_WIDTH;
-        // Simple pixel city layout
-        ctx.fillRect(sx + 10, CANVAS_HEIGHT - GROUND_HEIGHT - 60, 25, 60);
-        ctx.fillRect(sx + 45, CANVAS_HEIGHT - GROUND_HEIGHT - 90, 30, 90);
-        ctx.fillRect(sx + 85, CANVAS_HEIGHT - GROUND_HEIGHT - 50, 20, 50);
-        ctx.fillRect(sx + 115, CANVAS_HEIGHT - GROUND_HEIGHT - 80, 35, 80);
-        ctx.fillRect(sx + 160, CANVAS_HEIGHT - GROUND_HEIGHT - 40, 25, 40);
-        ctx.fillRect(sx + 195, CANVAS_HEIGHT - GROUND_HEIGHT - 100, 35, 100);
-        ctx.fillRect(sx + 240, CANVAS_HEIGHT - GROUND_HEIGHT - 60, 20, 60);
-        ctx.fillRect(sx + 270, CANVAS_HEIGHT - GROUND_HEIGHT - 75, 40, 75);
-        ctx.fillRect(sx + 320, CANVAS_HEIGHT - GROUND_HEIGHT - 50, 25, 50);
-        ctx.fillRect(sx + 355, CANVAS_HEIGHT - GROUND_HEIGHT - 90, 30, 90);
+
+        // Pagoda structures with detailed dimensions
+        const pagodas = [
+          { x: sx + 12, width: 38, height: 115, tiers: 4 },
+          { x: sx + 72, width: 30, height: 80, tiers: 3 },
+          { x: sx + 128, width: 44, height: 140, tiers: 5 },
+          { x: sx + 192, width: 32, height: 90, tiers: 3 },
+          { x: sx + 248, width: 40, height: 125, tiers: 4 },
+          { x: sx + 312, width: 28, height: 70, tiers: 2 },
+          { x: sx + 355, width: 36, height: 110, tiers: 4 },
+        ];
+
+        pagodas.forEach((p) => {
+          const baseY = CANVAS_HEIGHT - GROUND_HEIGHT;
+          const tierHeight = p.height / p.tiers;
+
+          // 1. Foundation Base Stone Platform
+          ctx.fillStyle = '#334155'; // Dark slate stone base
+          ctx.fillRect(p.x - 2, baseY - 6, p.width + 4, 6);
+          ctx.fillStyle = '#64748b'; // Highlight rim
+          ctx.fillRect(p.x - 2, baseY - 6, p.width + 4, 1.5);
+
+          // 2. Main Wooden Body Stem (Dark Timber + Vermilion Pillars)
+          ctx.fillStyle = '#18181b'; // Dark wood timber
+          ctx.fillRect(p.x + 4, baseY - p.height, p.width - 8, p.height);
+
+          // Vermilion vertical corner posts
+          ctx.fillStyle = '#991b1b';
+          ctx.fillRect(p.x + 3, baseY - p.height, 3, p.height);
+          ctx.fillRect(p.x + p.width - 6, baseY - p.height, 3, p.height);
+
+          // 3. Draw Tiers with curved flared roofs, balconies, and wind bells
+          for (let t = 0; t < p.tiers; t++) {
+            const tierY = baseY - (t + 1) * tierHeight;
+            const roofWidth = p.width + (p.tiers - t) * 5;
+            const roofX = p.x + (p.width - roofWidth) / 2;
+
+            // Balcony railing under roof
+            ctx.fillStyle = '#7f1d1d'; // Crimson dark red balcony
+            ctx.fillRect(roofX + 4, tierY + 12, roofWidth - 8, 3);
+            ctx.fillStyle = '#f59e0b'; // Gold balcony posts
+            ctx.fillRect(roofX + 6, tierY + 12, 1.5, 3);
+            ctx.fillRect(roofX + roofWidth - 7.5, tierY + 12, 1.5, 3);
+
+            // Shaded lattice window light
+            ctx.fillStyle = 'rgba(254, 240, 138, 0.9)'; // Soft warm golden window glow
+            ctx.fillRect(p.x + p.width / 2 - 3, tierY + 15, 6, 6);
+            ctx.fillStyle = '#18181b'; // Lattice cross
+            ctx.fillRect(p.x + p.width / 2 - 0.5, tierY + 15, 1, 6);
+            ctx.fillRect(p.x + p.width / 2 - 3, tierY + 17.5, 6, 1);
+
+            // Slate Roof Shading (Curved Eaves)
+            ctx.fillStyle = '#1e293b'; // Slate tile dark shadow
+            ctx.beginPath();
+            ctx.moveTo(roofX - 6, tierY + 6);
+            ctx.quadraticCurveTo(p.x + p.width / 2, tierY - 3, roofX + roofWidth + 6, tierY + 6);
+            ctx.lineTo(roofX + roofWidth + 2, tierY + 11);
+            ctx.quadraticCurveTo(p.x + p.width / 2, tierY + 2, roofX - 2, tierY + 11);
+            ctx.closePath();
+            ctx.fill();
+
+            // Slate Roof Top Highlight
+            ctx.fillStyle = '#475569';
+            ctx.beginPath();
+            ctx.moveTo(roofX - 5, tierY + 5);
+            ctx.quadraticCurveTo(p.x + p.width / 2, tierY - 3, roofX + roofWidth + 5, tierY + 5);
+            ctx.lineTo(roofX + roofWidth + 3, tierY + 7);
+            ctx.quadraticCurveTo(p.x + p.width / 2, tierY - 1, roofX - 3, tierY + 7);
+            ctx.closePath();
+            ctx.fill();
+
+            // Vermilion roof ridge beam
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(roofX, tierY + 9, roofWidth, 2);
+
+            // Golden furin wind bells hanging at roof eave tips
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(roofX - 5, tierY + 7, 2, 3);
+            ctx.fillRect(roofX + roofWidth + 3, tierY + 7, 2, 3);
+          }
+
+          // 4. Golden Sorin Spire Top on Pagoda Peak
+          const topY = baseY - p.height;
+          // Spire shaft
+          ctx.fillStyle = '#d97706'; // Gold bronze
+          ctx.fillRect(p.x + p.width / 2 - 1, topY - 22, 2, 22);
+
+          // Spire rings (Kuragata / Nine rings)
+          ctx.fillStyle = '#fbbf24'; // Bright gold
+          for (let r = 0; r < 4; r++) {
+            const ringY = topY - 8 - r * 3.5;
+            ctx.fillRect(p.x + p.width / 2 - 3.5 + r * 0.4, ringY, 7 - r * 0.8, 1.8);
+          }
+
+          // Top Sacred Jewel (Hoju)
+          ctx.beginPath();
+          ctx.arc(p.x + p.width / 2, topY - 24, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
       }
 
-      // Draw City Window lights (subtle glows)
-      ctx.fillStyle = 'rgba(253, 224, 71, 0.4)'; // translucent yellow
-      for (let offset = 0; offset <= 1; offset++) {
-        const sx = skylineX + offset * CANVAS_WIDTH;
-        ctx.fillRect(sx + 50, CANVAS_HEIGHT - GROUND_HEIGHT - 80, 4, 6);
-        ctx.fillRect(sx + 65, CANVAS_HEIGHT - GROUND_HEIGHT - 70, 4, 6);
-        ctx.fillRect(sx + 120, CANVAS_HEIGHT - GROUND_HEIGHT - 60, 4, 6);
-        ctx.fillRect(sx + 135, CANVAS_HEIGHT - GROUND_HEIGHT - 70, 4, 6);
-        ctx.fillRect(sx + 205, CANVAS_HEIGHT - GROUND_HEIGHT - 85, 4, 6);
-        ctx.fillRect(sx + 215, CANVAS_HEIGHT - GROUND_HEIGHT - 65, 4, 6);
-        ctx.fillRect(sx + 280, CANVAS_HEIGHT - GROUND_HEIGHT - 60, 4, 6);
-        ctx.fillRect(sx + 295, CANVAS_HEIGHT - GROUND_HEIGHT - 45, 4, 6);
-        ctx.fillRect(sx + 365, CANVAS_HEIGHT - GROUND_HEIGHT - 80, 4, 6);
-      }
-
-      // Draw Pipes
+      // Draw Vermilion Temple Pipes / Pillars
       pipesRef.current.forEach((pipe) => {
-        // Set colors
-        const darkGreen = "#15803d"; // green-700
-        const lightGreen = "#4ade80"; // green-400
-        const mainGreen = "#22c55e"; // green-500
+        // Japanese Temple Vermilion Red & Gold palette
+        const mainRed = "#dc2626"; // red-600 vermilion
+        const darkRed = "#991b1b"; // red-800 deep shade
+        const lightRed = "#f87171"; // red-400 highlight
+        const goldAccent = "#fbbf24"; // amber-400 gold trim
         
-        ctx.strokeStyle = '#052e16'; // outline black-green
+        ctx.strokeStyle = '#450a0a'; // Dark maroon border
         ctx.lineWidth = 2.5;
 
         // --- Top Pipe ---
         // Main body
-        ctx.fillStyle = mainGreen;
+        ctx.fillStyle = mainRed;
         ctx.beginPath();
         ctx.rect(pipe.x, 0, pipe.width, pipe.topHeight);
         ctx.fill();
         ctx.stroke();
 
         // Shading/Highlight on body
-        ctx.fillStyle = lightGreen;
-        ctx.fillRect(pipe.x + 4, 0, 6, pipe.topHeight);
-        ctx.fillStyle = darkGreen;
+        ctx.fillStyle = lightRed;
+        ctx.fillRect(pipe.x + 4, 0, 5, pipe.topHeight);
+        ctx.fillStyle = darkRed;
         ctx.fillRect(pipe.x + pipe.width - 12, 0, 8, pipe.topHeight);
 
+        // Gold Trim Line
+        ctx.fillStyle = goldAccent;
+        ctx.fillRect(pipe.x + 2, pipe.topHeight - 26, pipe.width - 4, 3);
+
         // Pipe Lip
-        ctx.fillStyle = mainGreen;
+        ctx.fillStyle = darkRed;
         ctx.beginPath();
         ctx.rect(pipe.x - 4, pipe.topHeight - 22, pipe.width + 8, 22);
         ctx.fill();
         ctx.stroke();
 
-        // Lip Highlight & Shading
-        ctx.fillStyle = lightGreen;
-        ctx.fillRect(pipe.x - 2, pipe.topHeight - 20, 6, 18);
-        ctx.fillStyle = darkGreen;
-        ctx.fillRect(pipe.x + pipe.width - 2, pipe.topHeight - 20, 4, 18);
+        // Lip Highlight & Gold Trim
+        ctx.fillStyle = lightRed;
+        ctx.fillRect(pipe.x - 2, pipe.topHeight - 20, 5, 18);
+        ctx.fillStyle = goldAccent;
+        ctx.fillRect(pipe.x - 4, pipe.topHeight - 4, pipe.width + 8, 4);
 
         // --- Bottom Pipe ---
         const bottomY = CANVAS_HEIGHT - GROUND_HEIGHT - pipe.bottomHeight;
         // Main body
-        ctx.fillStyle = mainGreen;
+        ctx.fillStyle = mainRed;
         ctx.beginPath();
         ctx.rect(pipe.x, bottomY, pipe.width, pipe.bottomHeight);
         ctx.fill();
         ctx.stroke();
 
         // Shading/Highlight on body
-        ctx.fillStyle = lightGreen;
-        ctx.fillRect(pipe.x + 4, bottomY, 6, pipe.bottomHeight);
-        ctx.fillStyle = darkGreen;
+        ctx.fillStyle = lightRed;
+        ctx.fillRect(pipe.x + 4, bottomY, 5, pipe.bottomHeight);
+        ctx.fillStyle = darkRed;
         ctx.fillRect(pipe.x + pipe.width - 12, bottomY, 8, pipe.bottomHeight);
 
+        // Gold Trim Line
+        ctx.fillStyle = goldAccent;
+        ctx.fillRect(pipe.x + 2, bottomY + 23, pipe.width - 4, 3);
+
         // Pipe Lip
-        ctx.fillStyle = mainGreen;
+        ctx.fillStyle = darkRed;
         ctx.beginPath();
         ctx.rect(pipe.x - 4, bottomY, pipe.width + 8, 22);
         ctx.fill();
         ctx.stroke();
 
-        // Lip Highlight & Shading
-        ctx.fillStyle = lightGreen;
-        ctx.fillRect(pipe.x - 2, bottomY + 2, 6, 18);
-        ctx.fillStyle = darkGreen;
-        ctx.fillRect(pipe.x + pipe.width - 2, bottomY + 2, 4, 18);
+        // Lip Highlight & Gold Trim
+        ctx.fillStyle = lightRed;
+        ctx.fillRect(pipe.x - 2, bottomY + 2, 5, 18);
+        ctx.fillStyle = goldAccent;
+        ctx.fillRect(pipe.x - 4, bottomY, pipe.width + 8, 4);
       });
 
       // Draw Ground
@@ -807,7 +902,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
         ctx.restore();
       });
 
-      // Draw Bird (Phoenix/Flappy Bird)
+      // Draw Crow (Black Raven / Crow with Red Hat)
       const bird = birdRef.current;
       ctx.save();
       ctx.translate(bird.x, bird.y);
@@ -817,53 +912,79 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2;
 
-      // 1. Draw Tail feathers (Black/Grey)
-      ctx.fillStyle = '#18181b';
+      // 1. Draw Tail Feathers (Sharp Crow Tail - Charcoal/Black)
+      ctx.fillStyle = '#111116';
       ctx.beginPath();
-      ctx.moveTo(-13, 0);
-      ctx.lineTo(-21, -6);
-      ctx.lineTo(-19, 0);
-      ctx.lineTo(-21, 6);
+      ctx.moveTo(-12, 0);
+      ctx.lineTo(-24, -8);
+      ctx.lineTo(-20, -2);
+      ctx.lineTo(-25, 3);
+      ctx.lineTo(-20, 5);
+      ctx.lineTo(-23, 10);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // 2. Draw Yellow Body
-      ctx.fillStyle = '#facc15'; // yellow-400
+      // 2. Draw Black Crow Body (Dark Charcoal/Raven Black)
+      ctx.fillStyle = '#1e1e24'; // Raven black
       ctx.beginPath();
       ctx.ellipse(0, 0, 16, 12, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // 3. Draw Beak (Orange)
-      ctx.fillStyle = '#f97316'; // orange-500
+      // Body feather highlight
+      ctx.fillStyle = '#3f3f46';
       ctx.beginPath();
-      ctx.moveTo(13, -1);
-      ctx.lineTo(23, 2);
-      ctx.lineTo(12, 6);
+      ctx.ellipse(-2, -4, 10, 5, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. Draw Sharp Crow Beak (Dark Grey / Black Crow Beak)
+      ctx.fillStyle = '#27272a'; // Dark slate grey beak
+      ctx.beginPath();
+      ctx.moveTo(12, -2);
+      ctx.quadraticCurveTo(20, -1, 26, 4); // Slightly hooked upper beak
+      ctx.lineTo(13, 7);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // 4. Draw wing (flaps depending on velocity or timer)
-      ctx.fillStyle = '#eab308'; // darker yellow
+      // Beak highlight line
+      ctx.strokeStyle = '#71717a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(13, 0);
+      ctx.lineTo(23, 3);
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#000000';
+
+      // 4. Draw Wing (Crow wing flaps up & down)
+      ctx.fillStyle = '#09090b'; // Deepest black wing
       ctx.save();
       ctx.translate(-4, 2);
       if (bird.flapTimer > 0) {
-        ctx.rotate(-0.4); // Wing flapped up
+        ctx.rotate(-0.45); // Wing flapped up
       } else {
-        ctx.rotate(0.3); // Wing down
+        ctx.rotate(0.35); // Wing down
       }
       ctx.beginPath();
-      ctx.ellipse(-3, 0, 9, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(-3, 0, 10, 7, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+
+      // Wing feather lines
+      ctx.strokeStyle = '#3f3f46';
+      ctx.beginPath();
+      ctx.moveTo(-8, -2);
+      ctx.lineTo(2, 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#000000';
       ctx.restore();
 
-      // 5. Draw Eye (Big white round eye)
+      // 5. Draw Eye (Sharp Crow Eye - White circle with pupil)
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(6, -4, 6, 0, Math.PI * 2);
+      ctx.arc(6, -4, 5.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
@@ -873,11 +994,16 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
       ctx.arc(7.5, -4, 2.5, 0, Math.PI * 2);
       ctx.fill();
 
-      // 6. Draw Red Santa-like Hat on head
+      // Eye catchlight (white reflection dot)
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(8.5, -5, 1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 6. Draw Red Hat on Crow Head
       // Fur trim (white base band)
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      // Drawn relative to bird center (around head area top)
       ctx.roundRect(-10, -17, 18, 5, 2.5);
       ctx.fill();
       ctx.stroke();
