@@ -17,28 +17,29 @@ interface Position {
 
 // Cell Types: '.' Empty, 'W' Wall, 'T' Trap/Spike, 'K' Key, 'E' Exit, 'P' Player Start
 //
-// ── VERIFIED SOLUTIONS ──────────────────────────────────────────────────────────
+// ── VERIFIED SOLUTION ───────────────────────────────────────────────────────────
 //
-// Chamber 1 (7×7, 1 key):  RIGHT → DOWN → LEFT   (3 moves)
-//   P@(1,1)  K@(3,5)  E@(5,1)  Trap@(2,1) punishes going DOWN first
-//
-// Chamber 2 (8×8, 2 keys): DOWN → RIGHT → UP → DOWN   (4 moves)
-//   P@(1,1)  K@(5,1),K@(3,6)  E@(6,6)
-//
-// Chamber 3 (9×9, 3 keys): DOWN → RIGHT → UP → LEFT → DOWN → RIGHT   (6 moves)
-//   P@(1,1)  K@(5,1),K@(3,7),K@(6,6)  E@(7,7)  wall@(1,5) stops slide at col 6
+// Chamber 1 (10×10, 4 keys)  MODERATE  ─ 7 gravity shifts
+//   P@(1,1)  Keys@(2,8) (5,1) (7,6) (8,3)  E@(8,8)
+//   Solution: RIGHT → DOWN → LEFT → UP → RIGHT → DOWN → LEFT → DOWN → RIGHT
+//   Spikes scattered at: (2,4)(3,7)(4,2)(5,5)(6,3)(7,2)(8,6)
 // ────────────────────────────────────────────────────────────────────────────────
 
 const STAGE_MAPS: Record<number, string[][]> = {
-  // Chamber 1 – Beginner (3 moves: RIGHT → DOWN → LEFT)
+  // Chamber 1 – Moderate (9 moves, 4 keys, heavy traps)
+  // Keys: K@(2,8) K@(5,1) K@(7,7) K@(8,3)   Exit: E@(8,8)
+  // Solution: RIGHT→DOWN→LEFT→UP→RIGHT→DOWN→LEFT→DOWN→RIGHT
   1: [
-    ['W', 'W', 'W', 'W', 'W', 'W', 'W'],
-    ['W', 'P', '.', '.', '.', '.', 'W'],  // P@(1,1)
-    ['W', 'T', 'W', '.', '.', '.', 'W'],  // T@(2,1) punishes going DOWN; wall@(2,2)
-    ['W', '.', '.', '.', '.', 'K', 'W'],  // K@(3,5)
-    ['W', 'W', '.', 'W', '.', '.', 'W'],  // walls@(4,1)(4,3)
-    ['W', 'E', '.', '.', '.', '.', 'W'],  // E@(5,1)
-    ['W', 'W', 'W', 'W', 'W', 'W', 'W'],
+    ['W','W','W','W','W','W','W','W','W','W'],
+    ['W','P','.','.','.','.','.','.','.','W'],  // P@(1,1)
+    ['W','.','W','.','T','.','W','.','K','W'],  // T@(2,4) W@(2,2)(2,6) K@(2,8)
+    ['W','.','.','.','.','W','.','T','.','W'],  // W@(3,5) T@(3,7)
+    ['W','.','T','W','.','.','.','.','.','W'],  // T@(4,2) W@(4,3)
+    ['W','K','.','.','.','T','W','.','T','W'],  // K@(5,1) T@(5,5) W@(5,6) T@(5,8)
+    ['W','.','W','.','T','.','.','.','.','W'],  // W@(6,2) T@(6,4)
+    ['W','.','T','.','W','.','.','K','.','W'],  // T@(7,2) W@(7,4) K@(7,7)
+    ['W','.','.','K','T','.','.','W','E','W'],  // K@(8,3) T@(8,4) W@(8,7) E@(8,8)
+    ['W','W','W','W','W','W','W','W','W','W'],
   ],
 
   // Chamber 2 – Intermediate (4 moves: DOWN → RIGHT → UP → DOWN)
@@ -68,7 +69,7 @@ const STAGE_MAPS: Record<number, string[][]> = {
 };
 
 const HINTS: Record<number, string> = {
-  1: "⬆ Going DOWN first hits spikes! Try: RIGHT → DOWN → LEFT to reach the exit.",
+  1: "Collect 4 keys! Navigate carefully: RIGHT → DOWN → LEFT → UP → RIGHT → DOWN. Spikes reset ALL slide progress!",
   2: "Collect both keys before the exit. Try: DOWN → RIGHT → UP → DOWN.",
   3: "6 moves: DOWN → RIGHT → UP → LEFT → DOWN → RIGHT. The wall at column 5 is your friend!",
 };

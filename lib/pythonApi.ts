@@ -35,41 +35,15 @@ export interface FinalCrystalData {
 export const FALLBACK_L1_ROOMS: Level1RoomData[] = [
   {
     roomId: 1,
-    name: "Chamber 1: The Gravity Well",
-    description: "Shift room gravity UP, DOWN, LEFT, or RIGHT to slide across the floor, collect the rune key, and reach the exit.",
+    name: "Chamber of the Abyssal Labyrinth",
+    description: "Navigate demonic spike corridors, collect all 4 rune keys, and unseal the exit portal. Beware — spikes reset your progress!",
     puzzle: {
       id: "l1_p1",
-      title: "Gravity Shift Vault 1",
-      description: "Shift gravity direction to reach the exit portal.",
+      title: "Gravity Shift Vault — Moderate",
+      description: "Collect all 4 rune keys by shifting gravity, then reach the exit portal.",
       type: "gravity",
       targetAnswer: "GRAVITY_SOLVED",
-      hint: "Use Arrow keys, WASD, or control buttons to change gravity."
-    }
-  },
-  {
-    roomId: 2,
-    name: "Chamber 2: Spike Vault Matrix",
-    description: "Demonic spikes litter the floor. Carefully tilt gravity to avoid traps, collect all keys, and enter the exit portal.",
-    puzzle: {
-      id: "l1_p2",
-      title: "Gravity Shift Vault 2",
-      description: "Avoid spike traps while shifting gravity.",
-      type: "gravity",
-      targetAnswer: "GRAVITY_SOLVED",
-      hint: "Watch out for spike tiles that reset your position!"
-    }
-  },
-  {
-    roomId: 3,
-    name: "Chamber 3: Abyssal Gravity Core",
-    description: "Navigate narrow spike corridors and collect multiple keys before unsealing the final portal.",
-    puzzle: {
-      id: "l1_p3",
-      title: "Gravity Shift Vault 3",
-      description: "Collect all rune keys in the abyssal gravity maze.",
-      type: "gravity",
-      targetAnswer: "GRAVITY_SOLVED",
-      hint: "Collect all keys to unseal the exit portal."
+      hint: "Plan each gravity shift carefully. Spikes will reset your position and you'll lose keys collected in that slide."
     }
   }
 ];

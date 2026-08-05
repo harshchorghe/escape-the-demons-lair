@@ -13,17 +13,13 @@ interface Level1ScreenProps {
   myRole: 'player1' | 'player2';
 }
 
-const ROOM_ICONS = ["🌀", "⚡", "🌌"];
-const ROOM_COLORS = [
-  "from-red-900/40 to-red-950/60 border-red-700/50 hover:border-red-500",
-  "from-amber-900/40 to-amber-950/60 border-amber-700/50 hover:border-amber-500",
-  "from-purple-900/40 to-purple-950/60 border-purple-700/50 hover:border-purple-500",
-];
+const ROOM_ICON = "🌀";
+const ROOM_COLOR = "from-red-900/40 to-red-950/60 border-red-700/50 hover:border-red-500";
 
 export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   const [rooms, setRooms] = useState<Level1RoomData[]>(FALLBACK_L1_ROOMS);
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
-  const [roomTimer, setRoomTimer] = useState<number>(60);
+  const [roomTimer, setRoomTimer] = useState<number>(90);
   const [feedback, setFeedback] = useState<{ success?: boolean; message: string }>({ message: '' });
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,7 +34,7 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   // 60s room countdown
   useEffect(() => {
     if (activeRoomId === null || state.gameStatus !== 'playing') return;
-    setRoomTimer(60);
+    setRoomTimer(90);
     const interval = setInterval(() => {
       setRoomTimer((prev) => {
         if (prev <= 1) {
@@ -56,13 +52,8 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   const handleRoomTimeout = (failedId: number) => {
     const fresh = gameSync.getState();
     const updatedFailed = Array.from(new Set([...(fresh.l1FailedRooms || []), failedId]));
-    if (updatedFailed.length >= 2) {
-      gameSync.updateState({ l1FailedRooms: updatedFailed, gameStatus: 'disqualified' });
-    } else {
-      gameSync.updateState({ l1FailedRooms: updatedFailed });
-      setActiveRoomId(null);
-      setFeedback({ message: `⏰ Chamber ${failedId} timed out! Select another chamber.` });
-    }
+    // Single room — any timeout means disqualified
+    gameSync.updateState({ l1FailedRooms: updatedFailed, gameStatus: 'disqualified' });
   };
 
   const handleEnterRoom = (roomId: number) => {
@@ -83,32 +74,28 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
       const fresh = gameSync.getState();
       const currentCompleted = fresh.l1CompletedRooms || [];
       const updatedCompleted = Array.from(new Set([...currentCompleted, activeRoomId]));
-      if (updatedCompleted.length >= 2) {
-        const now = Date.now();
-        const l2Sec = fresh.level2Duration || 120;
-        if (fresh.teamCode) {
-          pythonApi.startRoomTimer(fresh.teamCode, 2);
-        }
-        gameSync.updateState({
-          l1CompletedRooms: updatedCompleted,
-          l1IsCompleted: true,
-          currentLevel: 2,
-          timeRemaining: l2Sec,
-          levelStartTime: now,
-          timePenalties: 0,
-        });
-      } else {
-        gameSync.updateState({ l1CompletedRooms: updatedCompleted });
-        setTimeout(() => setActiveRoomId(null), 1200);
+      // Single room — completing it immediately advances to level 2
+      const now = Date.now();
+      const l2Sec = fresh.level2Duration || 120;
+      if (fresh.teamCode) {
+        pythonApi.startRoomTimer(fresh.teamCode, 2);
       }
+      gameSync.updateState({
+        l1CompletedRooms: updatedCompleted,
+        l1IsCompleted: true,
+        currentLevel: 2,
+        timeRemaining: l2Sec,
+        levelStartTime: now,
+        timePenalties: 0,
+      });
     }
   };
 
   const currentRoom = activeRoomId !== null ? rooms.find((r) => r.roomId === activeRoomId) || rooms[0] : null;
   const completed = (state.l1CompletedRooms || []).length;
   const failed = (state.l1FailedRooms || []).length;
-  const timerPct = (roomTimer / 60) * 100;
-  const timerColor = roomTimer <= 10 ? "bg-red-500" : roomTimer <= 25 ? "bg-amber-500" : "bg-emerald-500";
+  const timerPct = (roomTimer / 90) * 100;
+  const timerColor = roomTimer <= 15 ? "bg-red-500" : roomTimer <= 35 ? "bg-amber-500" : "bg-emerald-500";
 
   // ── ROOM SELECTION HUB ──────────────────────────────────────────────
   if (activeRoomId === null) {
@@ -118,17 +105,9 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
         <div className="relative z-10 max-w-2xl mx-auto px-4 py-8 space-y-8">
           {/* Header */}
           <div className="text-center space-y-2">
-            <p className="text-xs font-mono tracking-widest text-red-400 uppercase">Level 1 · Anti-Gravity Chambers</p>
-            <h2 className="text-3xl font-extrabold text-white font-serif">Choose a Gravity Vault</h2>
-            <p className="text-sm text-zinc-400">Clear any <strong className="text-emerald-400">2 of 3 gravity chambers</strong> to advance. Each chamber gives you <strong className="text-amber-400">60 seconds</strong>.</p>
-          </div>
-
-          {/* Progress bar */}
-          <div className="flex items-center gap-3">
-            {[0, 1].map((i) => (
-              <div key={i} className={`flex-1 h-2 rounded-full transition-all duration-500 ${i < completed ? 'bg-emerald-500' : 'bg-zinc-800'}`} />
-            ))}
-            <span className="text-xs font-mono text-zinc-400 shrink-0">{completed}/2</span>
+            <p className="text-xs font-mono tracking-widest text-red-400 uppercase">Level 1 · Anti-Gravity Chamber</p>
+            <h2 className="text-3xl font-extrabold text-white font-serif">Enter the Gravity Vault</h2>
+            <p className="text-sm text-zinc-400">Clear the <strong className="text-emerald-400">Abyssal Labyrinth</strong> to advance. Collect all <strong className="text-amber-400">4 rune keys</strong> then reach the exit. You have <strong className="text-red-400">90 seconds</strong>.</p>
           </div>
 
           {/* Timeout warning */}
@@ -139,9 +118,9 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
             </div>
           )}
 
-          {/* Room cards */}
+          {/* Single room card */}
           <div className="grid grid-cols-1 gap-4">
-            {rooms.map((room, idx) => {
+            {rooms.slice(0, 1).map((room) => {
               const isDone = (state.l1CompletedRooms || []).includes(room.roomId);
               const isFailed = (state.l1FailedRooms || []).includes(room.roomId);
               const isLocked = isDone || isFailed;
@@ -156,23 +135,28 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
                       ? 'border-emerald-600/50 from-emerald-950/50 to-emerald-950/30 opacity-80 cursor-default'
                       : isFailed
                       ? 'border-zinc-700/40 from-zinc-950 to-zinc-950 opacity-50 cursor-default'
-                      : `${ROOM_COLORS[idx]} cursor-pointer hover:scale-[1.01] active:scale-[0.99]`
+                      : `${ROOM_COLOR} cursor-pointer hover:scale-[1.01] active:scale-[0.99]`
                   }`}
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-3xl shrink-0 ${
                       isDone ? 'bg-emerald-900/60' : isFailed ? 'bg-zinc-900/60' : 'bg-black/30'
                     }`}>
-                      {isDone ? <CheckCircle className="w-8 h-8 text-emerald-400" /> : isFailed ? '💀' : ROOM_ICONS[idx]}
+                      {isDone ? <CheckCircle className="w-8 h-8 text-emerald-400" /> : isFailed ? '💀' : ROOM_ICON}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-500">Chamber {room.roomId}</span>
+                        <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500">⚔️ Moderate Difficulty</span>
                         {isDone && <span className="text-[10px] bg-emerald-900/80 text-emerald-400 border border-emerald-600/40 font-mono px-2 py-0.5 rounded-full font-bold">CLEARED ✓</span>}
                         {isFailed && <span className="text-[10px] bg-red-950/80 text-red-400 border border-red-800/40 font-mono px-2 py-0.5 rounded-full font-bold">TIMED OUT</span>}
                       </div>
                       <h3 className="text-lg font-bold text-white">{room.name}</h3>
-                      <p className="text-xs text-zinc-400 truncate">{room.description}</p>
+                      <p className="text-xs text-zinc-400 mt-1">{room.description}</p>
+                      <div className="flex gap-3 mt-2">
+                        <span className="text-[10px] font-mono bg-amber-950/60 text-amber-400 border border-amber-800/40 px-2 py-0.5 rounded-full">🗝️ 4 Keys Required</span>
+                        <span className="text-[10px] font-mono bg-red-950/60 text-red-400 border border-red-800/40 px-2 py-0.5 rounded-full">⏱ 90 Seconds</span>
+                        <span className="text-[10px] font-mono bg-zinc-900/80 text-zinc-400 border border-zinc-700/40 px-2 py-0.5 rounded-full">💀 Multiple Traps</span>
+                      </div>
                     </div>
                     {!isLocked && (
                       <ArrowRight className="w-5 h-5 text-zinc-400 group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
@@ -182,12 +166,6 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
               );
             })}
           </div>
-
-          {failed > 0 && (
-            <p className="text-center text-xs text-zinc-500 font-mono">
-              ⚠️ {failed} room{failed > 1 ? 's' : ''} timed out · {2 - completed} more needed · {failed >= 2 ? 'Disqualified!' : 'Still in the game!'}
-            </p>
-          )}
         </div>
       </div>
     );
