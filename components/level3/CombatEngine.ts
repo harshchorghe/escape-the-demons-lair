@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { DemonSlayerCharacter } from './DemonSlayerCharacter';
 import { EffectsEngine } from './EffectsEngine';
 import { sound } from './SoundSynthesizer';
+import { gameSync } from '@/lib/gameStore';
 
 export interface CombatStats {
   playerHp: number;
@@ -13,12 +14,15 @@ export interface CombatStats {
   combo: number;
   announcement: string;
   isDemonDefeated: boolean;
+  demonsDefeated: number;
+  totalDemons: number;
 }
 
 export interface CombatCallbacks {
   onStatsChange?: (stats: CombatStats) => void;
   onAnnouncement?: (text: string) => void;
-  onDemonDefeated?: () => void;
+  onDemonDefeated?: (count: number) => void;
+  onAllDemonsDefeated?: () => void;
 }
 
 export class CombatEngine {
@@ -32,6 +36,10 @@ export class CombatEngine {
   public playerMaxHp: number = 100;
   public playerStamina: number = 100;
   public playerMaxStamina: number = 100;
+
+  // Demons Defeated Counter (Goal: 50)
+  public demonsDefeated: number = 0;
+  public totalDemons: number = 50;
 
   public combo: number = 0;
   public comboTimer: NodeJS.Timeout | null = null;
@@ -59,12 +67,14 @@ export class CombatEngine {
     scene: THREE.Scene,
     character: DemonSlayerCharacter,
     effectsEngine: EffectsEngine,
-    callbacks: CombatCallbacks = {}
+    callbacks: CombatCallbacks = {},
+    initialDemonsDefeated: number = 0
   ) {
     this.scene = scene;
     this.character = character;
     this.effects = effectsEngine;
     this.callbacks = callbacks;
+    this.demonsDefeated = initialDemonsDefeated;
 
     this.spawnDemonTarget();
   }
@@ -81,6 +91,8 @@ export class CombatEngine {
         combo: this.combo,
         announcement: this.announcement,
         isDemonDefeated: this.demonHp <= 0,
+        demonsDefeated: this.demonsDefeated,
+        totalDemons: this.totalDemons,
       });
     }
 
@@ -116,7 +128,9 @@ export class CombatEngine {
     this.demonHp = 150;
     this.demonState = 'idle';
 
-    const skinMat = new THREE.MeshToonMaterial({ color: 0x4a1525 });
+    const colors = [0x5c1527, 0x3d174a, 0x1f382a, 0x472212, 0x6e1b1b];
+    const colorIndex = (this.demonsDefeated) % colors.length;
+    const skinMat = new THREE.MeshToonMaterial({ color: colors[colorIndex] });
     const hornMat = new THREE.MeshStandardMaterial({ color: 0xffea00, roughness: 0.2, metalness: 0.8 });
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 
@@ -172,7 +186,10 @@ export class CombatEngine {
     rightArm.rotation.z = 0.3;
     group.add(rightArm);
 
-    group.position.set(0, 0, -4);
+    // Randomize position in circle around arena center
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 3.5 + Math.random() * 4.5;
+    group.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
     this.scene.add(group);
 
     this.demon = {
@@ -185,7 +202,7 @@ export class CombatEngine {
     };
 
     this.notifyStats();
-    this.showAnnouncement("DEMON TARGET APPEARED!");
+    this.showAnnouncement(`DEMON #${this.demonsDefeated + 1} SPAWNED!`);
   }
 
   // Perform Light Katana Slash
@@ -329,21 +346,36 @@ export class CombatEngine {
 
       if (this.demonHp <= 0) {
         this.demonState = 'dead';
-        this.showAnnouncement("💥 DEMON VANQUISHED & DEFEATED!");
+        
+        // Atomically increment team demon kill count across network & local tabs
+        gameSync.updateState((prev) => {
+          const nextCount = (prev.l3DemonsDefeated || 0) + 1;
+          this.demonsDefeated = nextCount;
+          return { l3DemonsDefeated: nextCount };
+        });
         
         this.effects.spawnBreathingEffect('flame', demonPos, new THREE.Vector3(0, 1, 0));
         this.effects.spawnBreathingEffect('thunder', demonPos, new THREE.Vector3(0, 1, 0));
         
         if (this.callbacks.onDemonDefeated) {
-          this.callbacks.onDemonDefeated();
+          this.callbacks.onDemonDefeated(this.demonsDefeated);
         }
 
-        setTimeout(() => {
-          if (this.demon) {
-            this.scene.remove(this.demon.group);
-            this.demon = null;
+        if (this.demonsDefeated >= this.totalDemons) {
+          this.showAnnouncement("🎉 VICTORY! ALL 50 DEMONS ELIMINATED!");
+          if (this.callbacks.onAllDemonsDefeated) {
+            this.callbacks.onAllDemonsDefeated();
           }
-        }, 1000);
+        } else {
+          this.showAnnouncement(`💥 DEMON DEFEATED! (${this.demonsDefeated}/${this.totalDemons})`);
+          setTimeout(() => {
+            if (this.demon) {
+              this.scene.remove(this.demon.group);
+              this.demon = null;
+            }
+            this.spawnDemonTarget();
+          }, 600);
+        }
       }
     }
   }

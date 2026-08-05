@@ -31,6 +31,8 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     combo: 0,
     announcement: 'OWNDAYS TANJIRO FRAME ACTIVE!',
     isDemonDefeated: false,
+    demonsDefeated: 0,
+    totalDemons: 50,
   });
 
   const [currentStyle, setCurrentStyle] = useState<'water' | 'flame' | 'thunder'>('water');
@@ -40,7 +42,16 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
   const [announcementText, setAnnouncementText] = useState("OWNDAYS TANJIRO FRAME ACTIVE!");
   const [showAnnouncement, setShowAnnouncement] = useState(true);
 
-  const isL2Complete = state.currentLevel >= 3;
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+    if (combatRef.current && typeof state.l3DemonsDefeated === 'number') {
+      if (state.l3DemonsDefeated > combatRef.current.demonsDefeated) {
+        combatRef.current.demonsDefeated = state.l3DemonsDefeated;
+        combatRef.current.notifyStats();
+      }
+    }
+  }, [state]);
 
   // Initialize 3D Engine
   useEffect(() => {
@@ -88,35 +99,66 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     buildArena(scene);
     buildSkySphere(scene);
 
-    // 6. Character & Combat Engine
+    // 6. Character & Partner Character for Duo Arena
     const character = new DemonSlayerCharacter(scene);
+    if (myRole === 'player2') {
+      character.setBreathingStyle('thunder');
+    }
     characterRef.current = character;
+
+    // Partner Character in scene for co-op feel
+    const partnerCharacter = new DemonSlayerCharacter(scene);
+    partnerCharacter.group.position.set(myRole === 'player1' ? 1.8 : -1.8, 0, 0);
+    partnerCharacter.setBreathingStyle(myRole === 'player1' ? 'thunder' : 'water');
 
     const effects = new EffectsEngine(scene, camera);
 
-    const combat = new CombatEngine(scene, character, effects, {
-      onStatsChange: (newStats) => {
-        setStats(newStats);
-      },
-      onAnnouncement: (text) => {
-        setAnnouncementText(text);
-        setShowAnnouncement(true);
-        setTimeout(() => setShowAnnouncement(false), 2000);
-      },
-      onDemonDefeated: () => {
-        // Update game state for victory!
-        const level3DurationSec = state.level3Duration || 210;
-        const l3TimeSpent = Math.max(1, level3DurationSec - state.timeRemaining);
+    const combat = new CombatEngine(
+      scene,
+      character,
+      effects,
+      {
+        onStatsChange: (newStats) => {
+          setStats(newStats);
+        },
+        onAnnouncement: (text) => {
+          setAnnouncementText(text);
+          setShowAnnouncement(true);
+          setTimeout(() => setShowAnnouncement(false), 2000);
+        },
+        onDemonDefeated: (count) => {
+          gameSync.updateState({ l3DemonsDefeated: count });
+        },
+        onAllDemonsDefeated: () => {
+          const level3DurationSec = state.level3Duration || 240;
+          const l3TimeSpent = Math.max(1, level3DurationSec - state.timeRemaining);
 
-        gameSync.updateState({
-          l3DemonHp: 0,
-          l3TimeElapsed: l3TimeSpent,
-          currentLevel: 4,
-          gameStatus: 'victory',
-          isDemonSealed: true,
-        });
-      }
-    });
+          gameSync.updateState({
+            l3DemonHp: 0,
+            l3DemonsDefeated: 50,
+            l3TimeElapsed: l3TimeSpent,
+            currentLevel: 4,
+            gameStatus: 'victory',
+            isDemonSealed: true,
+          });
+
+          // Save run to global leaderboard
+          import('@/lib/leaderboardService').then(({ saveTeamScore }) => {
+            saveTeamScore({
+              teamCode: state.teamCode || 'TEAM-' + Math.floor(Math.random() * 9000 + 1000),
+              teamName: state.teamName || 'Demon Slayers',
+              player1: state.player1Name || 'Player 1',
+              player2: state.player2Name || 'Player 2',
+              levelsCompleted: 3,
+              totalTimeSeconds: l3TimeSpent,
+              gameStatus: 'victory',
+              date: new Date().toLocaleDateString(),
+            });
+          });
+        }
+      },
+      state.l3DemonsDefeated || 0
+    );
     combatRef.current = combat;
 
     // 7. Input State Loop
@@ -174,9 +216,11 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     // 9. Main Animation Loop
     const clock = new THREE.Clock();
     let animFrameId: number;
+    let frameCounter = 0;
 
     const animate = () => {
       animFrameId = requestAnimationFrame(animate);
+      frameCounter++;
 
       const deltaTime = Math.min(clock.getDelta(), 0.1);
 
@@ -211,6 +255,33 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
           targetRotation,
           0.15
         );
+      }
+
+      // Broadcast local player's 3D position over network/broadcast channel every 6 frames (~10Hz)
+      if (frameCounter % 6 === 0) {
+        const charPos = character.group.position;
+        const charRot = character.group.rotation.y;
+        if (myRole === 'player1') {
+          gameSync.updateState({ p1Pos: { x: charPos.x, z: charPos.z, rot: charRot, state: character.state } });
+        } else {
+          gameSync.updateState({ p2Pos: { x: charPos.x, z: charPos.z, rot: charRot, state: character.state } });
+        }
+      }
+
+      // Smoothly update remote partner character's 3D position & movement in partner's screen
+      const partnerData = myRole === 'player1' ? stateRef.current.p2Pos : stateRef.current.p1Pos;
+      if (partnerData && partnerCharacter) {
+        const prevX = partnerCharacter.group.position.x;
+        const prevZ = partnerCharacter.group.position.z;
+
+        partnerCharacter.group.position.x = THREE.MathUtils.lerp(partnerCharacter.group.position.x, partnerData.x, 0.2);
+        partnerCharacter.group.position.z = THREE.MathUtils.lerp(partnerCharacter.group.position.z, partnerData.z, 0.2);
+        partnerCharacter.group.rotation.y = THREE.MathUtils.lerp(partnerCharacter.group.rotation.y, partnerData.rot, 0.2);
+
+        const distSq = (partnerCharacter.group.position.x - prevX) ** 2 + (partnerCharacter.group.position.z - prevZ) ** 2;
+        const isPartnerMoving = distSq > 0.0005;
+
+        partnerCharacter.update(deltaTime, isPartnerMoving, new THREE.Vector3());
       }
 
       character.update(deltaTime, isMoving, moveDir);
@@ -361,8 +432,29 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
             </div>
           </div>
 
-          {/* Top Center: Combo Counter & Live Announcement */}
-          <div className="flex flex-col items-center justify-center text-center space-y-2 mx-auto">
+          {/* Top Center: 50 Demons Elimination Tracker, Combo Counter & Live Announcement */}
+          <div className="flex flex-col items-center justify-center text-center space-y-2 mx-auto pointer-events-auto">
+            {/* 50 Demons Elimination Challenge Badge */}
+            <div className="bg-zinc-950/90 border border-red-800/80 px-5 py-2.5 rounded-2xl shadow-2xl space-y-1 max-w-xs">
+              <div className="flex items-center justify-between text-[11px] font-mono font-extrabold gap-4">
+                <span className="text-red-400 flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" /> DEMONS DEFEATED
+                </span>
+                <span className="text-amber-400 font-extrabold text-xs">
+                  {state.l3DemonsDefeated || stats.demonsDefeated || 0} / 50
+                </span>
+              </div>
+              <div className="w-full h-3 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-red-600 via-amber-500 to-yellow-400 transition-all duration-500 shadow-[0_0_12px_rgba(239,68,68,0.7)]"
+                  style={{ width: `${Math.min(100, Math.round(((state.l3DemonsDefeated || stats.demonsDefeated || 0) / 50) * 100))}%` }}
+                />
+              </div>
+              <p className="text-[9px] font-mono text-zinc-400 uppercase tracking-wider">
+                Defeat all 50 Demons fast to rank #1 on Leaderboard!
+              </p>
+            </div>
+
             {stats.combo > 0 && (
               <div className="animate-bounce">
                 <div className="text-5xl font-black font-serif text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.8)]">

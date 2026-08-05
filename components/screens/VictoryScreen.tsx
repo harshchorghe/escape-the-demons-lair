@@ -99,18 +99,25 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
           <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
             <span className="text-xs font-mono text-zinc-400 uppercase block">Team Code</span>
-            <span className="text-lg font-mono font-bold text-white">{state.teamCode}</span>
+            <span className="text-lg font-mono font-bold text-white">{state.teamCode || 'LAIR-DEMO'}</span>
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-            <span className="text-xs font-mono text-zinc-400 uppercase block">Total Time Taken</span>
+            <span className="text-xs font-mono text-zinc-400 uppercase block">Demons Slain</span>
+            <span className="text-lg font-mono font-bold text-red-500 flex items-center justify-center gap-1">
+              🔥 50 / 50
+            </span>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+            <span className="text-xs font-mono text-zinc-400 uppercase block">Total Time</span>
             <span className="text-lg font-mono font-bold text-cyan-400">
               {formatSeconds(state.totalTimeElapsed || 0)}
             </span>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl col-span-2">
-            <span className="text-xs font-mono text-zinc-400 uppercase block">Level 3 Throne Room Time</span>
+          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+            <span className="text-xs font-mono text-zinc-400 uppercase block">Level 3 Time</span>
             <span className="text-lg font-mono font-bold text-emerald-400">
               {formatSeconds(state.l3TimeElapsed || 0)}
             </span>

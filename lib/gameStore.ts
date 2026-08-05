@@ -30,12 +30,16 @@ export interface GameGameState {
   timeRemaining: number;
   totalTimeElapsed: number;
   timePenalties: number;
+  l3DemonsDefeated: number; // Demons defeated in Level 3 out of 50
+  l3TotalDemons: number; // Target demons (50)
   l3TimeElapsed: number; // Level 3 only timer for leaderboard ranking
   l3DemonHp: number; // Demon Lord current HP
   l3MaxDemonHp: number; // Demon Lord max HP (500)
   l3DemonStance: 'idle' | 'charging' | 'shielded' | 'vulnerable' | 'enraged';
   l3Player1Gesture: 'FIST' | 'PALM' | 'PEACE' | null;
   l3Player2Gesture: 'FIST' | 'PALM' | 'PEACE' | null;
+  p1Pos?: { x: number; z: number; rot: number; state: string };
+  p2Pos?: { x: number; z: number; rot: number; state: string };
   l3ComboCount: number;
   level1Duration: number;
   level2Duration: number;
@@ -66,16 +70,20 @@ export const INITIAL_GAME_STATE: GameGameState = {
   timeRemaining: 60, // Level 1 default: 60s (1 min)
   totalTimeElapsed: 0,
   timePenalties: 0,
+  l3DemonsDefeated: 0,
+  l3TotalDemons: 50,
   l3TimeElapsed: 0,
   l3DemonHp: 500,
   l3MaxDemonHp: 500,
   l3DemonStance: 'idle',
   l3Player1Gesture: null,
   l3Player2Gesture: null,
+  p1Pos: { x: -1.8, z: 0, rot: 0, state: 'idle' },
+  p2Pos: { x: 1.8, z: 0, rot: 0, state: 'idle' },
   l3ComboCount: 0,
   level1Duration: 60,
   level2Duration: 120,
-  level3Duration: 210, // Level 3 default: 3.5 minutes (210s)
+  level3Duration: 240, // Level 3 default: 4 minutes (240s)
   levelStartTime: null,
   missionStartTime: null,
   gameStatus: 'lobby',
@@ -179,6 +187,10 @@ class GameSyncManager {
             ...INITIAL_GAME_STATE,
             ...this.currentState,
             ...data,
+            l3DemonsDefeated: Math.max(
+              this.currentState.l3DemonsDefeated || 0,
+              data.l3DemonsDefeated || 0
+            ),
             l1CompletedRooms: Array.from(new Set([
               ...(this.currentState.l1CompletedRooms || []),
               ...(data.l1CompletedRooms || []),
@@ -234,6 +246,9 @@ class GameSyncManager {
     const newState = {
       ...this.currentState,
       ...partialUpdate,
+      l3DemonsDefeated: partialUpdate.l3DemonsDefeated !== undefined
+        ? Math.max(this.currentState.l3DemonsDefeated || 0, partialUpdate.l3DemonsDefeated)
+        : (this.currentState.l3DemonsDefeated || 0),
       l1CompletedRooms: partialUpdate.l1CompletedRooms !== undefined 
         ? partialUpdate.l1CompletedRooms 
         : (this.currentState.l1CompletedRooms || []),
@@ -299,7 +314,7 @@ class GameSyncManager {
   }
 
   public async fetchDefaultLevelTimers(): Promise<{ level1Seconds: number; level2Seconds: number; level3Seconds: number }> {
-    const defaults = { level1Seconds: 120, level2Seconds: 120, level3Seconds: 210 };
+    const defaults = { level1Seconds: 120, level2Seconds: 120, level3Seconds: 240 };
     if (isFirebaseInitialized && db) {
       try {
         const configRef = doc(db, 'config', 'levels');
