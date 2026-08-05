@@ -7,15 +7,15 @@ import { Level2LockedScreen } from "@/components/screens/Level2LockedScreen";
 import { 
   Camera, 
   CameraOff, 
-  Sliders, 
-  Keyboard, 
   Trophy, 
   AlertTriangle, 
   Award,
   Sparkles,
   RotateCcw,
   Play,
-  Video
+  Video,
+  Heart,
+  Skull
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
@@ -48,7 +48,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   const router = useRouter();
 
   // React State
-  const [controlMode, setControlMode] = useState<'gesture' | 'manual'>('manual');
+  const controlMode = 'gesture';
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [isCameraLoading, setIsCameraLoading] = useState(false);
   const [gestureDetected, setGestureDetected] = useState(false);
@@ -60,6 +60,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   const [countdown, setCountdown] = useState<number | null>(null);
 
   // Stats
+  const [lives, setLives] = useState(3);
   const [crashCount, setCrashCount] = useState(0);
   const [feedback, setFeedback] = useState<{ success?: boolean; message: string }>({ message: '' });
 
@@ -93,7 +94,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   
   const lastJumpTimeRef = useRef(0);
   const scoreRef = useRef(0);
-  const targetScore = 10;
+  const targetScore = 21;
 
   // Refs mirroring state for use inside long-running loops (hand detection, keyboard handler)
   // This prevents stale closures from capturing old state values
@@ -174,12 +175,17 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        try {
+          await videoRef.current.play();
+        } catch (playErr: any) {
+          if (playErr.name !== 'AbortError') {
+            console.error("Camera play error:", playErr);
+          }
+        }
       }
 
       setIsCameraEnabled(true);
       setIsCameraLoading(false);
-      setControlMode('gesture');
       setFeedback({ success: true, message: '📷 Camera connected! Show both hands and clap to fly!' });
 
       // Start detection loop
@@ -211,7 +217,6 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
       clearTimeout(gestureFlashTimerRef.current);
     }
     setIsCameraEnabled(false);
-    setControlMode('manual');
     handsCloseRef.current = false;
     setGestureDetected(false);
   };
@@ -227,13 +232,27 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync mode changes — auto-enable camera when gesture mode selected
+  // Auto-enable camera when Level 2 is unlocked & active
   useEffect(() => {
-    if (controlMode === 'gesture' && !isCameraEnabled && !isCameraLoading) {
+    if (state.l1IsCompleted && !isCameraEnabled && !isCameraLoading) {
       enableCamera();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controlMode]);
+  }, [state.l1IsCompleted]);
+
+  // Ensure video element receives camera stream as soon as DOM element mounts
+  useEffect(() => {
+    if (isCameraEnabled && cameraStreamRef.current && videoRef.current) {
+      if (videoRef.current.srcObject !== cameraStreamRef.current) {
+        videoRef.current.srcObject = cameraStreamRef.current;
+        videoRef.current.play().catch((playErr: any) => {
+          if (playErr.name !== 'AbortError') {
+            console.error("Camera play error:", playErr);
+          }
+        });
+      }
+    }
+  }, [isCameraEnabled, state.l1IsCompleted]);
 
   // Ref to always hold the latest triggerJump function
   const triggerJumpRef = useRef<() => void>(() => {});
@@ -358,6 +377,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
 
   // Initiate the 5-second countdown before the game starts
   const initiateCountdown = () => {
+    if (lives <= 0) return; // Cannot retry if out of lives!
     if (countdown !== null) return; // Already counting down
     // Reset bird position for the countdown visual
     birdRef.current.y = 200;
@@ -466,28 +486,53 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
     });
   };
 
+
+
   // Crash penalty and game restart trigger
   const handleCrash = () => {
     setIsPlaying(false);
     setIsGameOver(true);
-    setCrashCount(prev => prev + 1);
     spawnExplosionParticles();
 
-    setFeedback({ 
-      success: false, 
-      message: `💥 Demonic Trap Triggered! −15 seconds penalty!` 
-    });
+    setCrashCount(prev => prev + 1);
+    const newLives = Math.max(0, lives - 1);
+    setLives(newLives);
 
-    // Update global state with time penalty
-    gameSync.updateState((prev) => {
-      const nextTime = Math.max(0, prev.timeRemaining - 15);
-      return {
-        ...prev,
-        timeRemaining: nextTime,
-        timePenalties: prev.timePenalties + 15,
-        gameStatus: nextTime <= 0 ? 'disqualified' : prev.gameStatus,
-      };
-    });
+    if (newLives > 0) {
+      setFeedback({ 
+        success: false, 
+        message: `💥 Demonic Trap Triggered! −15s penalty! ${newLives} ${newLives === 1 ? 'life' : 'lives'} remaining.` 
+      });
+
+      // Update global state with time penalty
+      gameSync.updateState((prev) => {
+        const nextTime = Math.max(0, prev.timeRemaining - 15);
+        return {
+          ...prev,
+          timeRemaining: nextTime,
+          timePenalties: prev.timePenalties + 15,
+          gameStatus: nextTime <= 0 ? 'disqualified' : prev.gameStatus,
+        };
+      });
+    } else {
+      setFeedback({ 
+        success: false, 
+        message: `☠️ No current lives left! 3/3 attempts failed. Disqualified!` 
+      });
+
+      // Automatically transition to Disqualification Page after 2 seconds pop-up preview
+      setTimeout(() => {
+        gameSync.updateState((prev) => {
+          if (prev.gameStatus !== 'disqualified') {
+            return {
+              ...prev,
+              gameStatus: 'disqualified',
+            };
+          }
+          return prev;
+        });
+      }, 2000);
+    }
   };
 
   // Level progression victory sequence
@@ -562,22 +607,27 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           handleCrash();
         }
 
+        // Dynamic difficulty/speed boost after passing 15th pillar
+        const isSpeedBoosted = scoreRef.current >= 15;
+        const currentPipeSpeed = isSpeedBoosted ? 6.5 : 4.5;
+        const currentSpawnInterval = isSpeedBoosted ? 58 : 85;
+
         // Scroll Background & Parallax skyline
         bgScrollXRef.current = (bgScrollXRef.current - 0.5) % CANVAS_WIDTH;
         skylineScrollXRef.current = (skylineScrollXRef.current - 0.9) % CANVAS_WIDTH;
-        groundScrollXRef.current = (groundScrollXRef.current - PIPE_SPEED) % CANVAS_WIDTH;
+        groundScrollXRef.current = (groundScrollXRef.current - currentPipeSpeed) % CANVAS_WIDTH;
 
         // Spawn pipes
-        if (frameCount % PIPE_SPAWN_INTERVAL === 0) {
+        if (frameCount % currentSpawnInterval === 0) {
           spawnPipe();
         }
 
         // Update pipes
         for (let i = pipesRef.current.length - 1; i >= 0; i--) {
           const pipe = pipesRef.current[i];
-          pipe.x -= PIPE_SPEED;
+          pipe.x -= currentPipeSpeed;
 
-          // Check score pass (Unlimited scoring synced to Firebase!)
+          // Check score pass (Pass 21 pillars to complete Level 2!)
           if (!pipe.passed && pipe.x + pipe.width / 2 < bird.x) {
             pipe.passed = true;
             scoreRef.current += 1;
@@ -585,11 +635,23 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
             setScore(newScore);
             updateHighScore(newScore);
 
+            if (newScore === 15) {
+              setFeedback({
+                success: true,
+                message: '⚡ SPEED BOOST! Winds accelerating for the final stretch! ⚡'
+              });
+            }
+
             // Sync score to Firebase Firestore state in real-time
             gameSync.updateState((prev) => ({
               ...prev,
               l2Score: Math.max(prev.l2Score || 0, newScore),
             }));
+
+            // Automatically complete Level 2 when 21 pillars are passed!
+            if (newScore >= targetScore) {
+              triggerVictory();
+            }
           }
 
           // Check collision (forgiving hitbox)
@@ -1060,7 +1122,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
         </h2>
         <p className="text-sm text-zinc-400 max-w-lg mx-auto">
-          The Exit Portal is locked. Navigate the Phoenix through the toxic pillars to escape. 
+          The Exit Portal is locked. Navigate the Phoenix through 21 toxic pillars to escape. 
           Make a fist or pinch your fingers in front of the camera to fly!
         </p>
       </div>
@@ -1089,11 +1151,26 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
             {/* Score HUD overlays */}
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-xl text-white font-mono text-sm shadow">
               <Trophy className="w-4 h-4 text-yellow-400" />
-              <span>Score: <strong className="text-yellow-400 font-bold">{score}</strong></span>
+              <span>Pillars: <strong className="text-yellow-400 font-bold">{score} / {targetScore}</strong></span>
+              {score >= 15 && (
+                <span className="ml-1 text-[10px] font-bold bg-amber-500/20 border border-amber-500/50 text-amber-400 px-1.5 py-0.5 rounded animate-pulse">
+                  ⚡ 2.4x SPEED
+                </span>
+              )}
             </div>
 
-            <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-xl text-zinc-300 font-mono text-sm shadow">
-              <span>Best: {highScore}</span>
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-xl text-zinc-300 font-mono text-sm shadow">
+              <span className="text-xs uppercase text-zinc-400 font-bold mr-1">Lives:</span>
+              {[1, 2, 3].map((i) => (
+                <Heart
+                  key={i}
+                  className={`w-4 h-4 transition-all ${
+                    i <= lives
+                      ? 'fill-red-500 text-red-500 animate-pulse'
+                      : 'fill-zinc-800 text-zinc-700'
+                  }`}
+                />
+              ))}
             </div>
 
             {/* Canvas Element */}
@@ -1117,7 +1194,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                       {countdown === 0 ? 'GO!' : countdown}
                     </span>
                   </div>
-                  <p className="text-sm text-zinc-400">Prepare to <span className="text-yellow-400 font-bold">{controlMode === 'gesture' ? 'clench fist or pinch' : 'press space'}</span>!</p>
+                  <p className="text-sm text-zinc-400">Prepare to <span className="text-yellow-400 font-bold">clench fist or pinch</span>!</p>
                 </div>
               </div>
             )}
@@ -1127,29 +1204,70 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs font-mono p-6 text-center select-none">
                 {isGameOver && (
                   <div className="space-y-6 animate-in fade-in zoom-in duration-200">
-                    <div className="w-16 h-16 rounded-full bg-red-950/80 border border-red-700/60 flex items-center justify-center mx-auto shadow-lg shadow-red-950 animate-bounce">
-                      <AlertTriangle className="w-8 h-8 text-red-500" />
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-2xl font-extrabold text-red-500 uppercase tracking-wider animate-pulse">Crashed!</h3>
-                      <p className="text-sm text-zinc-300 font-sans">Demonic traps triggered a <span className="text-red-400 font-bold">-15s</span> penalty!</p>
-                    </div>
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={initiateCountdown}
-                        className="px-5 py-3 bg-red-700 hover:bg-red-600 border-2 border-red-500 text-white rounded-xl font-bold flex items-center gap-2 active:scale-95 transition-all shadow-lg shadow-red-900/40 cursor-pointer text-xs"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        Try Again
-                      </button>
-                      <button
-                        onClick={triggerVictory}
-                        className="px-5 py-3 bg-purple-700 hover:bg-purple-600 border-2 border-purple-500 text-white rounded-xl font-bold flex items-center gap-2 active:scale-95 transition-all shadow-lg shadow-purple-900/40 cursor-pointer text-xs"
-                      >
-                        <Play className="w-4 h-4" />
-                        Proceed to Level 3
-                      </button>
-                    </div>
+                    {lives > 0 ? (
+                      <>
+                        <div className="w-16 h-16 rounded-full bg-red-950/80 border border-red-700/60 flex items-center justify-center mx-auto shadow-lg shadow-red-950 animate-bounce">
+                          <AlertTriangle className="w-8 h-8 text-red-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="text-2xl font-extrabold text-red-500 uppercase tracking-wider animate-pulse">
+                            Crashed!
+                          </h3>
+                          <p className="text-sm text-zinc-300 font-sans">
+                            Demonic traps triggered a <span className="text-red-400 font-bold">-15s</span> penalty!
+                          </p>
+                          <div className="flex justify-center gap-1 items-center pt-2">
+                            {[1, 2, 3].map((i) => (
+                              <Heart
+                                key={i}
+                                className={`w-5 h-5 ${
+                                  i <= lives
+                                    ? 'fill-red-500 text-red-500'
+                                    : 'fill-zinc-900 text-zinc-700'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={initiateCountdown}
+                            className="px-6 py-3 bg-red-700 hover:bg-red-600 border-2 border-red-500 text-white rounded-xl font-bold flex items-center gap-2 active:scale-95 transition-all shadow-lg shadow-red-900/40 cursor-pointer text-xs"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                            Try Again ({lives} {lives === 1 ? 'Life' : 'Lives'} Left)
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-5">
+                        <div className="w-20 h-20 rounded-full bg-red-950 border-4 border-red-600 flex items-center justify-center mx-auto shadow-2xl shadow-red-950 animate-bounce">
+                          <AlertTriangle className="w-10 h-10 text-red-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="inline-block bg-red-950/80 border border-red-800 text-red-400 font-mono text-[10px] uppercase px-3 py-1 rounded-full font-bold tracking-widest">
+                            0 / 3 Lives Remaining
+                          </div>
+                          <h3 className="text-2xl font-black text-red-500 uppercase tracking-wider animate-pulse font-serif">
+                            NO CURRENT LIVES LEFT!
+                          </h3>
+                          <p className="text-xs text-zinc-300 font-sans max-w-[280px] mx-auto leading-relaxed">
+                            All 3 attempts failed without clearing 21 obstacles. Your team has been disqualified!
+                          </p>
+                          <div className="flex justify-center gap-2 items-center pt-2">
+                            {[1, 2, 3].map((i) => (
+                              <Heart
+                                key={i}
+                                className="w-6 h-6 fill-zinc-900 text-zinc-700 stroke-[1.5]"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-xs font-mono text-zinc-500 animate-pulse">
+                          Redirecting to Disqualification Page...
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1174,7 +1292,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                     <div className="space-y-2">
                       <h3 className="text-2xl font-extrabold text-yellow-400 uppercase tracking-wider">Demonic Cavern</h3>
                       <p className="text-xs text-zinc-300 max-w-[280px] leading-relaxed font-sans">
-                        Fly through the toxic pillars to score <strong className="text-yellow-400">unlimited points</strong> for your team!
+                        Fly through <strong className="text-yellow-400">21 toxic pillars</strong> to unlock the portal to Level 3!
                       </p>
                     </div>
                     <div className="flex flex-col gap-2">
@@ -1185,14 +1303,6 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                         <Play className="w-4 h-4 fill-white" />
                         Start Escape
                       </button>
-                      {score > 0 && (
-                        <button
-                          onClick={triggerVictory}
-                          className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white border border-emerald-600 rounded-xl font-bold flex items-center justify-center gap-2 mx-auto active:scale-95 transition-all text-xs"
-                        >
-                          Save Score &amp; Go to Level 3
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}
@@ -1201,49 +1311,15 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           </div>
 
           <p className="mt-3 text-xs text-zinc-500 font-mono flex items-center gap-1.5">
-            <Keyboard className="w-3.5 h-3.5" />
-            Tip: Press [Spacebar] or Click the screen to flap manually anytime.
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            Tip: Make a fist or pinch your fingers in front of the camera to fly!
           </p>
         </div>
 
         {/* Right Column: Controls & Camera Panel (5 cols on md+) */}
         <div className="md:col-span-5 space-y-5">
           
-          {/* 1. Control Mode Toggle */}
-          <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5 shadow-xl space-y-4">
-            <h3 className="text-sm font-mono uppercase tracking-wider text-zinc-400 font-bold flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-purple-400" />
-              Control Settings
-            </h3>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setControlMode('manual')}
-                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-mono font-bold border transition-all cursor-pointer ${
-                  controlMode === 'manual'
-                    ? 'bg-zinc-800 border-zinc-600 text-white shadow-lg'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
-                }`}
-              >
-                <Keyboard className="w-4 h-4" />
-                Manual Mode
-              </button>
-
-              <button
-                onClick={() => setControlMode('gesture')}
-                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-mono font-bold border transition-all cursor-pointer ${
-                  controlMode === 'gesture'
-                    ? 'bg-purple-950/70 border-purple-800/80 text-purple-200 shadow-lg shadow-purple-950/30'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
-                }`}
-              >
-                <Camera className="w-4 h-4" />
-                Gesture Mode
-              </button>
-            </div>
-          </div>
-
-          {/* 2. Camera & Hand Tracking Card */}
+          {/* 1. Camera & Hand Tracking Card */}
           <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5 shadow-xl space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-mono uppercase tracking-wider text-zinc-400 font-bold flex items-center gap-2">
@@ -1338,14 +1414,23 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5 shadow-xl space-y-4">
             <h3 className="text-sm font-mono uppercase tracking-wider text-zinc-400 font-bold flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500" />
-              Lair Warnings
+              Lair Status &amp; Lives
             </h3>
 
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-              <span className="text-xs font-mono text-zinc-400">Total Crashes:</span>
-              <span className={`text-sm font-mono font-bold ${crashCount > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-                {crashCount}
-              </span>
+              <span className="text-xs font-mono text-zinc-400">Remaining Lives:</span>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3].map((i) => (
+                  <Heart
+                    key={i}
+                    className={`w-4 h-4 ${
+                      i <= lives
+                        ? 'fill-red-500 text-red-500'
+                        : 'fill-zinc-800 text-zinc-700'
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center justify-between pt-1">
