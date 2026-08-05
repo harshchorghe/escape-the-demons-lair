@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demon Slayer 3D - OWNDAYS Spectacle Collection</title>
+  <meta name="description" content="Interactive 3D Demon Slayer character experience featuring OWNDAYS Kimetsu no Yaiba Spectacles, movement, breathing techniques, health system, sound effects, and Blender OBJ export.">
+  
+  <!-- Google Fonts for Anime Japanese Fantasy Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Noto+Serif+JP:wght@600;900&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Three.js Engine & OrbitControls via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Red Hit Screen Overlay for Damage Flash -->
+  <div id="damage-flash"></div>
+
+  <!-- HUD Container -->
+  <div id="hud">
+    <!-- Top Left: Player Status Panel (Health, Stamina, Breathing Style & OWNDAYS Glasses) -->
+    <div class="hud-panel status-panel">
+      <div class="character-badge">
+        <div class="avatar-frame">
+          <span class="avatar-icon" id="avatar-icon">👓</span>
+        </div>
+        <div class="character-info">
+          <h1 class="character-name">OWNDAYS SLAYER <span class="jp-sub">鬼殺隊 × OWNDAYS</span></h1>
+          <div class="style-title" id="style-title">Tanjiro OWNDAYS Frame • 水の呼吸</div>
+        </div>
+      </div>
+
+      <!-- Health Bar -->
+      <div class="stat-container">
+        <div class="stat-header">
+          <span class="stat-label">HEALTH (HP)</span>
+          <span class="stat-value" id="hp-value">100 / 100</span>
+        </div>
+        <div class="bar-outer hp-bar-outer">
+          <div class="bar-ghost" id="hp-ghost"></div>
+          <div class="bar-fill hp-bar-fill" id="hp-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+
+      <!-- Stamina / Breathing Gauge -->
+      <div class="stat-container">
+        <div class="stat-header">
+          <span class="stat-label">BREATHING STAMINA</span>
+          <span class="stat-value" id="stamina-value">100 / 100</span>
+        </div>
+        <div class="bar-outer stamina-bar-outer">
+          <div class="bar-fill stamina-bar-fill" id="stamina-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Right: Breathing Style & OWNDAYS Glasses Selector -->
+    <div class="hud-panel style-panel">
+      <div class="panel-header">OWNDAYS KIMETSU COLLECTION</div>
+      <div class="style-tabs">
+        <button class="style-tab active" data-style="water" id="tab-water">
+          <span class="tab-icon">🌊</span> Tanjiro Frame
+        </button>
+        <button class="style-tab" data-style="flame" id="tab-flame">
+          <span class="tab-icon">🔥</span> Kyojuro Frame
+        </button>
+        <button class="style-tab" data-style="thunder" id="tab-thunder">
+          <span class="tab-icon">⚡</span> Zenitsu Frame
+        </button>
+      </div>
+
+      <!-- Target Demon HP Panel -->
+      <div class="demon-target-card" id="demon-card">
+        <div class="stat-header">
+          <span class="stat-label demon-name">DEMON TARGET <span class="jp-sub">鬼</span></span>
+          <span class="stat-value" id="demon-hp-value">150 / 150</span>
+        </div>
+        <div class="bar-outer demon-bar-outer">
+          <div class="bar-fill demon-bar-fill" id="demon-hp-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Screen: Combo Counter & Messages -->
+    <div id="combo-container">
+      <div id="combo-count">0</div>
+      <div id="combo-label">COMBO HITS</div>
+    </div>
+
+    <div id="announcement">OWNDAYS TANJIRO FRAME ACTIVE!</div>
+
+    <!-- Bottom Left: On-Screen Touch / Quick Action Controls -->
+    <div class="hud-panel controls-panel">
+      <div class="action-grid">
+        <button class="btn-action btn-slash" id="btn-slash">
+          <span class="key-badge">J</span>
+          <span class="btn-text">Light Slash</span>
+        </button>
+        <button class="btn-action btn-special" id="btn-special">
+          <span class="key-badge">K</span>
+          <span class="btn-text" id="special-btn-text">Water Form 1</span>
+        </button>
+        <button class="btn-action btn-defeat" id="btn-defeat">
+          <span class="key-badge">X</span>
+          <span class="btn-text">⚔️ Defeat Demon</span>
+        </button>
+        <button class="btn-action btn-dash" id="btn-dash">
+          <span class="key-badge">SPACE</span>
+          <span class="btn-text">Dash</span>
+        </button>
+        <button class="btn-action btn-block" id="btn-block">
+          <span class="key-badge">SHIFT</span>
+          <span class="btn-text">Parry</span>
+        </button>
+        <button class="btn-action btn-heal" id="btn-heal">
+          <span class="key-badge">H</span>
+          <span class="btn-text">Heal</span>
+        </button>
+        <button class="btn-action btn-spawn" id="btn-spawn">
+          <span class="key-badge">N</span>
+          <span class="btn-text">Spawn Demon</span>
+        </button>
+        <button class="btn-action btn-glasses" id="btn-glasses">
+          <span class="key-badge">G</span>
+          <span class="btn-text">Glasses ON</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom Right: Utility Controls, Audio & Blender 3D Export -->
+    <div class="hud-panel utility-panel">
+      <button class="btn-util btn-export" id="btn-export" title="Export 3D Model for Blender">
+        📦 Export Blender 3D
+      </button>
+      <button class="btn-util" id="btn-sound" title="Toggle Sound">
+        <span id="sound-icon">🔊</span>
+      </button>
+      <button class="btn-util" id="btn-camera" title="Reset Camera">
+        🎥 Reset View
+      </button>
+      <button class="btn-util" id="btn-help" title="Controls Help">
+        ❓ Controls
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal Controls Guide -->
+  <div id="modal-help" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>CONTROLS LEGEND <span class="jp-sub">操作方法</span></h2>
+        <button class="btn-close" id="btn-close-help">×</button>
+      </div>
+      <div class="modal-body">
+        <table class="controls-table">
+          <tr><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or <kbd>Arrows</kbd></td><td>Move Demon Slayer</td></tr>
+          <tr><td><kbd>J</kbd> or <kbd>Left Click</kbd></td><td>Katana Light Slash Combo</td></tr>
+          <tr><td><kbd>K</kbd></td><td>Special Breathing Technique</td></tr>
+          <tr><td><kbd>X</kbd></td><td>⚔️ Defeat Demon Instant Finisher</td></tr>
+          <tr><td><kbd>SPACE</kbd></td><td>High-Speed Dodge / Dash</td></tr>
+          <tr><td><kbd>SHIFT</kbd></td><td>Guard / Parry Stance (-75% damage)</td></tr>
+          <tr><td><kbd>H</kbd></td><td>Total Concentration Gourd Heal</td></tr>
+          <tr><td><kbd>G</kbd></td><td>Toggle OWNDAYS Kimetsu Glasses</td></tr>
+          <tr><td><kbd>N</kbd></td><td>Spawn / Respawn Demon Target</td></tr>
+          <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>Switch OWNDAYS Glasses & Form (Tanjiro / Kyojuro / Zenitsu)</td></tr>
+          <tr><td><kbd>Mouse Drag</kbd></td><td>360° Orbit Camera</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Modules -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
