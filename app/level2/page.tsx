@@ -9,6 +9,7 @@ import { HeaderHUD } from "@/components/ui/HeaderHUD";
 import { PythonConfigModal } from "@/components/ui/PythonConfigModal";
 import { VictoryScreen } from "@/components/screens/VictoryScreen";
 import { DisqualifiedScreen } from "@/components/screens/DisqualifiedScreen";
+import BackgroundVideo from "@/components/3d/BackgroundVideo";
 import { useRouter } from "next/navigation";
 import { Skull } from "lucide-react";
 
@@ -56,41 +57,49 @@ export default function Level2Page() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-purple-900 selection:text-white font-sans">
-      <HeaderHUD
-        teamCode={gameState.teamCode}
-        myRole={myRole}
-        currentLevel={gameState.currentLevel}
-        timeRemaining={gameState.timeRemaining}
-        totalTimeElapsed={gameState.totalTimeElapsed}
-        onOpenPythonConfig={() => setIsPythonConfigOpen(true)}
-      />
+    <div className="relative min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-purple-900 selection:text-white font-sans overflow-hidden">
+      {/* Background Video for Level 2 */}
+      <div className="fixed inset-0 z-0 opacity-40 pointer-events-none">
+        <BackgroundVideo src="/videos/level_2.mp4" />
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/80 via-zinc-950/60 to-zinc-950/90" />
+      </div>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-4">
-        {/* Level 2: Demon Doors (shows locked screen until l1IsCompleted, then active doors) */}
-        {gameState.gameStatus === 'playing' && gameState.currentLevel >= 1 && gameState.currentLevel <= 2 && (
-          <Level2Screen state={gameState} myRole={myRole} />
-        )}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <HeaderHUD
+          teamCode={gameState.teamCode}
+          myRole={myRole}
+          currentLevel={gameState.currentLevel}
+          timeRemaining={gameState.timeRemaining}
+          totalTimeElapsed={gameState.totalTimeElapsed}
+          onOpenPythonConfig={() => setIsPythonConfigOpen(true)}
+        />
 
-        {/* Level 3: Final Throne Room */}
-        {gameState.gameStatus === 'playing' && gameState.currentLevel === 3 && (
-          <FinalLevelScreen state={gameState} myRole={myRole} />
-        )}
+        <main className="flex-1 flex flex-col items-center justify-center p-4">
+          {/* Level 2: Demon Doors (shows locked screen until l1IsCompleted, then active doors) */}
+          {gameState.gameStatus === 'playing' && gameState.currentLevel >= 1 && gameState.currentLevel <= 2 && (
+            <Level2Screen state={gameState} myRole={myRole} />
+          )}
 
-        {/* Victory Screen */}
-        {(gameState.gameStatus === 'victory' || gameState.currentLevel === 4) && (
-          <VictoryScreen state={gameState} />
-        )}
+          {/* Level 3: Final Throne Room */}
+          {gameState.gameStatus === 'playing' && gameState.currentLevel === 3 && (
+            <FinalLevelScreen state={gameState} myRole={myRole} />
+          )}
 
-        {/* Automatic Disqualification / Game Over Screen */}
-        {(gameState.gameStatus === 'disqualified' || gameState.gameStatus === 'gameover') && (
-          <DisqualifiedScreen state={gameState} />
-        )}
-      </main>
+          {/* Victory Screen */}
+          {(gameState.gameStatus === 'victory' || gameState.currentLevel === 4) && (
+            <VictoryScreen state={gameState} />
+          )}
 
-      <footer className="w-full border-t border-zinc-900 bg-zinc-950 px-4 py-3 text-center text-xs font-mono text-zinc-600">
-        Escape the Demon's Lair · Level 2: Demon Doors · {gameState.teamName || "Demon Slayers"}
-      </footer>
+          {/* Automatic Disqualification / Game Over Screen */}
+          {(gameState.gameStatus === 'disqualified' || gameState.gameStatus === 'gameover') && (
+            <DisqualifiedScreen state={gameState} />
+          )}
+        </main>
+
+        <footer className="w-full border-t border-zinc-900/80 bg-zinc-950/80 backdrop-blur-sm px-4 py-3 text-center text-xs font-mono text-zinc-600">
+          Escape the Demon's Lair · Level 2: Demon Doors · {gameState.teamName || "Demon Slayers"}
+        </footer>
+      </div>
 
       <PythonConfigModal isOpen={isPythonConfigOpen} onClose={() => setIsPythonConfigOpen(false)} />
     </div>
