@@ -318,22 +318,22 @@ class GameSyncManager {
         l3DemonsDefeated: partialUpdate.l3DemonsDefeated !== undefined
           ? Math.max(this.currentState.l3DemonsDefeated || 0, partialUpdate.l3DemonsDefeated)
           : (this.currentState.l3DemonsDefeated || 0),
-        l1CompletedRooms: partialUpdate.l1CompletedRooms !== undefined 
-          ? partialUpdate.l1CompletedRooms 
+        l1CompletedRooms: partialUpdate.l1CompletedRooms !== undefined
+          ? partialUpdate.l1CompletedRooms
           : (this.currentState.l1CompletedRooms || []),
-        l1FailedRooms: partialUpdate.l1FailedRooms !== undefined 
-          ? partialUpdate.l1FailedRooms 
+        l1FailedRooms: partialUpdate.l1FailedRooms !== undefined
+          ? partialUpdate.l1FailedRooms
           : (this.currentState.l1FailedRooms || []),
-        l2UnlockedDoors: partialUpdate.l2UnlockedDoors !== undefined 
-          ? partialUpdate.l2UnlockedDoors 
+        l2UnlockedDoors: partialUpdate.l2UnlockedDoors !== undefined
+          ? partialUpdate.l2UnlockedDoors
           : (this.currentState.l2UnlockedDoors || []),
-        l3DestroyedCrystals: partialUpdate.l3DestroyedCrystals !== undefined 
-          ? partialUpdate.l3DestroyedCrystals 
+        l3DestroyedCrystals: partialUpdate.l3DestroyedCrystals !== undefined
+          ? partialUpdate.l3DestroyedCrystals
           : (this.currentState.l3DestroyedCrystals || []),
         lastUpdated: Date.now(),
       };
     }
-    
+
     this.currentState = newState;
     this.saveToSession(newState);
 
@@ -349,6 +349,7 @@ class GameSyncManager {
     // Broadcast to Firebase if available
     if (isFirebaseInitialized && db && newState.teamCode) {
       try {
+        // Only send the fields that actually changed (plus lastUpdated) to prevent race conditions!
         const firestorePayload = { ...partialUpdate, lastUpdated: newState.lastUpdated };
         setDoc(doc(db, 'rooms', newState.teamCode), firestorePayload, { merge: true });
       } catch (e) {
