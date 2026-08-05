@@ -42,6 +42,8 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
   const [announcementText, setAnnouncementText] = useState("OWNDAYS TANJIRO FRAME ACTIVE!");
   const [showAnnouncement, setShowAnnouncement] = useState(true);
 
+  const isL2Complete = state.currentLevel >= 3;
+
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
