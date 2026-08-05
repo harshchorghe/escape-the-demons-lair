@@ -62,8 +62,8 @@ export default function Level3Page() {
       />
 
       <main className="flex-1 flex flex-col items-center justify-center p-4">
-        {/* Active Final Throne Room Level 3 (Handles both locked state and active divided tasks) */}
-        {gameState.gameStatus === 'playing' && (gameState.currentLevel === 3 || gameState.l1IsCompleted) && (
+        {/* Active Final Throne Room Level 3 */}
+        {gameState.gameStatus === 'playing' && gameState.currentLevel === 3 && (
           <FinalLevelScreen state={gameState} myRole={myRole} />
         )}
 
