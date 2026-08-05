@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ShieldAlert, Sparkles, RefreshCw, HelpCircle, CheckCircle, Key } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Key } from "lucide-react";
 
 interface GravityShiftPuzzleProps {
   chamberId: number; // 1, 2, or 3
   onSolve: (answer: string) => void;
 }
 
-type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'RIGHT_DOWN' | 'LEFT_DOWN' | 'RIGHT_UP' | 'LEFT_UP';
 
 interface Position {
   r: number;
@@ -16,65 +16,43 @@ interface Position {
 }
 
 // Cell Types: '.' Empty, 'W' Wall, 'T' Trap/Spike, 'K' Key, 'E' Exit, 'P' Player Start
-//
-// ── VERIFIED SOLUTION ───────────────────────────────────────────────────────────
-//
-// Chamber 1 (10×10, 4 keys)  MODERATE  ─ 7 gravity shifts
-//   P@(1,1)  Keys@(2,8) (5,1) (7,6) (8,3)  E@(8,8)
-//   Solution: RIGHT → DOWN → LEFT → UP → RIGHT → DOWN → LEFT → DOWN → RIGHT
-//   Spikes scattered at: (2,4)(3,7)(4,2)(5,5)(6,3)(7,2)(8,6)
-// ────────────────────────────────────────────────────────────────────────────────
 
 const STAGE_MAPS: Record<number, string[][]> = {
-  // Chamber 1 – Moderate (9 moves, 4 keys, heavy traps)
-  // Keys: K@(2,8) K@(5,1) K@(7,7) K@(8,3)   Exit: E@(8,8)
-  // Solution: RIGHT→DOWN→LEFT→UP→RIGHT→DOWN→LEFT→DOWN→RIGHT
   1: [
     ['W','W','W','W','W','W','W','W','W','W'],
-    ['W','P','.','.','.','.','.','.','.','W'],  // P@(1,1)
-    ['W','.','W','.','T','.','W','.','K','W'],  // T@(2,4) W@(2,2)(2,6) K@(2,8)
-    ['W','.','.','.','.','W','.','T','.','W'],  // W@(3,5) T@(3,7)
-    ['W','.','T','W','.','.','.','.','.','W'],  // T@(4,2) W@(4,3)
-    ['W','K','.','.','.','T','W','.','T','W'],  // K@(5,1) T@(5,5) W@(5,6) T@(5,8)
-    ['W','.','W','.','T','.','.','.','.','W'],  // W@(6,2) T@(6,4)
-    ['W','.','T','.','W','.','.','K','.','W'],  // T@(7,2) W@(7,4) K@(7,7)
-    ['W','.','.','K','T','.','.','W','E','W'],  // K@(8,3) T@(8,4) W@(8,7) E@(8,8)
+    ['W','P','.','.','.','.','.','.','.','W'],
+    ['W','.','W','.','T','.','W','.','K','W'],
+    ['W','.','.','.','.','W','.','T','.','W'],
+    ['W','.','T','W','.','.','.','.','.','W'],
+    ['W','K','.','.','.','T','W','.','T','W'],
+    ['W','.','W','.','T','.','.','.','.','W'],
+    ['W','.','T','.','W','.','.','K','.','W'],
+    ['W','.','.','K','T','.','.','W','E','W'],
     ['W','W','W','W','W','W','W','W','W','W'],
   ],
-
-  // Chamber 2 – Intermediate (4 moves: DOWN → RIGHT → UP → DOWN)
   2: [
     ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-    ['W', 'P', '.', '.', '.', '.', '.', 'W'],  // P@(1,1)
-    ['W', '.', 'W', '.', 'T', '.', '.', 'W'],  // wall@(2,2); T@(2,4) punishes going right then down
-    ['W', '.', '.', '.', '.', '.', 'K', 'W'],  // K@(3,6)
-    ['W', '.', '.', 'W', '.', 'W', '.', 'W'],  // walls@(4,3)(4,5)
-    ['W', 'K', '.', '.', '.', 'T', '.', 'W'],  // K@(5,1); T@(5,5)
-    ['W', '.', '.', '.', '.', '.', 'E', 'W'],  // E@(6,6)
+    ['W', 'P', '.', '.', '.', '.', '.', 'W'],
+    ['W', '.', 'W', '.', 'T', '.', '.', 'W'],
+    ['W', '.', '.', '.', '.', '.', 'K', 'W'],
+    ['W', '.', '.', 'W', '.', 'W', '.', 'W'],
+    ['W', 'K', '.', '.', '.', 'T', '.', 'W'],
+    ['W', '.', '.', '.', '.', '.', 'E', 'W'],
     ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
   ],
-
-  // Chamber 3 – Expert (6 moves: DOWN → RIGHT → UP → LEFT → DOWN → RIGHT)
   3: [
     ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
-    ['W', 'P', '.', '.', '.', 'W', '.', '.', 'W'],  // P@(1,1); wall@(1,5) stops LEFT slide at col 6
-    ['W', '.', 'W', '.', 'T', '.', '.', '.', 'W'],  // wall@(2,2); T@(2,4)
-    ['W', '.', '.', '.', '.', '.', '.', 'K', 'W'],  // K@(3,7)
-    ['W', '.', 'T', '.', 'W', '.', '.', '.', 'W'],  // T@(4,2); wall@(4,4)
-    ['W', 'K', '.', '.', '.', '.', '.', '.', 'W'],  // K@(5,1)
-    ['W', '.', '.', '.', 'T', '.', 'K', '.', 'W'],  // T@(6,4); K@(6,6)
-    ['W', '.', '.', '.', '.', '.', '.', 'E', 'W'],  // E@(7,7)
+    ['W', 'P', '.', '.', '.', 'W', '.', '.', 'W'],
+    ['W', '.', 'W', '.', 'T', '.', '.', '.', 'W'],
+    ['W', '.', '.', '.', '.', '.', '.', 'K', 'W'],
+    ['W', '.', 'T', '.', 'W', '.', '.', '.', 'W'],
+    ['W', 'K', '.', '.', '.', '.', '.', '.', 'W'],
+    ['W', '.', '.', '.', 'T', '.', 'K', '.', 'W'],
+    ['W', '.', '.', '.', '.', '.', '.', 'E', 'W'],
     ['W', 'W', 'W', 'W', 'W', 'W', 'W', 'W', 'W'],
   ],
 };
 
-const HINTS: Record<number, string> = {
-  1: "Collect 4 keys! Navigate carefully: RIGHT → DOWN → LEFT → UP → RIGHT → DOWN. Spikes reset ALL slide progress!",
-  2: "Collect both keys before the exit. Try: DOWN → RIGHT → UP → DOWN.",
-  3: "6 moves: DOWN → RIGHT → UP → LEFT → DOWN → RIGHT. The wall at column 5 is your friend!",
-};
-
-// Build a base map with 'P' replaced by '.' for clean collision checks
 function buildBaseMap(raw: string[][]): string[][] {
   return raw.map(row => row.map(cell => (cell === 'P' ? '.' : cell)));
 }
@@ -100,14 +78,12 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
   const startPos = findStart(rawMap);
   const totalKeys = countKeys(rawMap);
 
-  // collectedKeySet stores "r,c" strings of collected key positions
   const [player, setPlayer] = useState<Position>(startPos);
   const [collectedKeySet, setCollectedKeySet] = useState<Set<string>>(new Set());
   const [gravityDir, setGravityDir] = useState<Direction | null>(null);
   const [moveCount, setMoveCount] = useState<number>(0);
   const [trapHit, setTrapHit] = useState<boolean>(false);
   const [isSolved, setIsSolved] = useState<boolean>(false);
-  const [showHint, setShowHint] = useState<boolean>(false);
 
   const collectedKeys = collectedKeySet.size;
 
@@ -115,83 +91,65 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
     if (isSolved) return;
 
     setGravityDir(dir);
-    setMoveCount(prev => prev + 1);
     setTrapHit(false);
 
-    const dr = dir === 'UP' ? -1 : dir === 'DOWN' ? 1 : 0;
-    const dc = dir === 'LEFT' ? -1 : dir === 'RIGHT' ? 1 : 0;
+    const dr = (dir.includes('DOWN') ? 1 : 0) + (dir.includes('UP') ? -1 : 0);
+    const dc = (dir.includes('RIGHT') ? 1 : 0) + (dir.includes('LEFT') ? -1 : 0);
 
-    let currR = player.r;
-    let currC = player.c;
-    let hitSpike = false;
-    const newlyCollected = new Set<string>();
+    const nextR = player.r + dr;
+    const nextC = player.c + dc;
 
-    while (true) {
-      const nextR = currR + dr;
-      const nextC = currC + dc;
+    // Bounds check
+    if (nextR < 0 || nextR >= baseMap.length || nextC < 0 || nextC >= baseMap[0].length) return;
 
-      // Bounds check
-      if (nextR < 0 || nextR >= baseMap.length || nextC < 0 || nextC >= baseMap[0].length) break;
+    const baseCell = baseMap[nextR][nextC];
+    const keyId = `${nextR},${nextC}`;
 
-      const baseCell = baseMap[nextR][nextC];
-      const keyId = `${nextR},${nextC}`;
+    // Wall check: cannot move into wall
+    if (baseCell === 'W') return;
 
-      if (baseCell === 'W') {
-        // Wall — stop before it, do not move
-        break;
-      }
+    // Increment move count on valid step
+    setMoveCount(prev => prev + 1);
 
-      if (baseCell === 'T') {
-        // Spike — player slides into it and resets (keys from this slide are lost)
-        hitSpike = true;
-        break;
-      }
-
-      // Step into the cell
-      currR = nextR;
-      currC = nextC;
-
-      if (baseCell === 'K' && !collectedKeySet.has(keyId)) {
-        // Collect key, keep sliding
-        newlyCollected.add(keyId);
-      }
-
-      if (baseCell === 'E') {
-        // Stop at exit portal
-        break;
-      }
-    }
-
-    if (hitSpike) {
-      // Discard any keys picked up this slide; reset to start
+    // Trap check: stepping into trap resets player to start
+    if (baseCell === 'T') {
       setTrapHit(true);
       setPlayer(startPos);
-    } else {
-      setPlayer({ r: currR, c: currC });
+      return;
+    }
 
-      const nextCollectedSet = new Set(collectedKeySet);
-      newlyCollected.forEach(k => nextCollectedSet.add(k));
-      if (newlyCollected.size > 0) setCollectedKeySet(nextCollectedSet);
+    // Move player exactly 1 block
+    setPlayer({ r: nextR, c: nextC });
 
-      const totalAfterMove = nextCollectedSet.size;
-      const atExit = baseMap[currR][currC] === 'E';
-      if (atExit && totalAfterMove >= totalKeys) {
-        setIsSolved(true);
-        setTimeout(() => onSolve("GRAVITY_SOLVED"), 500);
-      }
+    // Collect key if present on this cell
+    const nextCollectedSet = new Set(collectedKeySet);
+    if (baseCell === 'K' && !nextCollectedSet.has(keyId)) {
+      nextCollectedSet.add(keyId);
+      setCollectedKeySet(nextCollectedSet);
+    }
+
+    // Check exit condition
+    const totalAfterMove = nextCollectedSet.size;
+    const atExit = baseCell === 'E';
+    if (atExit && totalAfterMove >= totalKeys) {
+      setIsSolved(true);
+      setTimeout(() => onSolve("GRAVITY_SOLVED"), 500);
     }
   }, [baseMap, isSolved, player, collectedKeySet, totalKeys, startPos, onSolve]);
 
-  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const map: Record<string, Direction> = {
-        ArrowUp: 'UP', KeyW: 'UP',
-        ArrowDown: 'DOWN', KeyS: 'DOWN',
-        ArrowLeft: 'LEFT', KeyA: 'LEFT',
-        ArrowRight: 'RIGHT', KeyD: 'RIGHT',
+      const keyMap: Record<string, Direction> = {
+        ArrowUp: 'UP', KeyW: 'UP', w: 'UP', W: 'UP',
+        ArrowDown: 'DOWN', KeyS: 'DOWN', s: 'DOWN', S: 'DOWN',
+        ArrowLeft: 'LEFT', KeyA: 'LEFT', a: 'LEFT', A: 'LEFT',
+        ArrowRight: 'RIGHT', KeyD: 'RIGHT', d: 'RIGHT', D: 'RIGHT',
+        Numpad1: 'LEFT_DOWN',
+        Numpad3: 'RIGHT_DOWN',
+        Numpad7: 'LEFT_UP',
+        Numpad9: 'RIGHT_UP',
       };
-      const dir = map[e.code];
+      const dir = keyMap[e.code] || keyMap[e.key];
       if (dir) {
         e.preventDefault();
         shiftGravity(dir);
@@ -210,22 +168,16 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
     setGravityDir(null);
   };
 
-  const handleAutoSolve = () => {
-    setIsSolved(true);
-    setTimeout(() => onSolve("GRAVITY_SOLVED"), 400);
-  };
-
   return (
     <div className="space-y-5 bg-black/50 backdrop-blur-md border border-red-900/50 rounded-2xl p-5 text-white shadow-2xl">
-      {/* Top Bar */}
       <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
         <div>
           <h3 className="text-lg font-bold font-serif text-red-400 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-400" />
-            Chamber {chamberId}: Gravity Shift Maze
+            Chamber {chamberId}: Demon Gravity Vault
           </h3>
           <p className="text-xs text-zinc-400">
-            Shift gravity to slide — collect all 🗝️ keys then reach the 🌀 exit portal.
+            Move the Demon 👹 1 block per step — collect all 🗝️ keys then reach the 🌀 exit.
           </p>
         </div>
         <div className="text-right space-y-1">
@@ -239,7 +191,6 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
         </div>
       </div>
 
-      {/* Trap Alert */}
       {trapHit && (
         <div className="p-3 bg-red-950/90 border border-red-600/80 rounded-xl text-xs font-mono text-red-300 flex items-center gap-2 animate-bounce">
           <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
@@ -247,9 +198,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
         </div>
       )}
 
-      {/* Grid & Controls */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-        {/* Arena Grid */}
         <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/90 rounded-2xl border border-zinc-800 shadow-2xl">
           <div className="grid gap-1 p-3 bg-black/80 rounded-xl border border-zinc-800">
             {baseMap.map((row, rIdx) => (
@@ -268,7 +217,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
                       key={cIdx}
                       className={`w-9 h-9 rounded-md flex items-center justify-center text-base font-bold transition-all duration-150 border ${
                         isPlayer
-                          ? 'bg-red-600 border-red-400 shadow-lg shadow-red-500/60 scale-110 animate-pulse'
+                          ? 'bg-red-700 border-red-500 shadow-lg shadow-red-600/70 scale-110 animate-pulse'
                           : isExit
                           ? exitUnlocked
                             ? 'bg-emerald-600 border-emerald-400 shadow-lg shadow-emerald-500/60 animate-bounce'
@@ -283,7 +232,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
                       }`}
                     >
                       {isPlayer
-                        ? '🔴'
+                        ? '👹'
                         : isExit
                         ? '🌀'
                         : isKeyUncollected
@@ -298,119 +247,138 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
             ))}
           </div>
 
-          {/* Legend */}
-          <div className="flex gap-3 mt-3 text-[10px] font-mono text-zinc-500">
-            <span>🔴 You</span>
+          <div className="flex gap-3 mt-3 text-[10px] font-mono text-zinc-400">
+            <span>👹 Demon</span>
             <span>🗝️ Key</span>
             <span>🌀 Exit</span>
             <span>💀 Trap</span>
           </div>
         </div>
 
-        {/* Control Pad */}
         <div className="space-y-4">
-          <span className="text-xs font-mono text-amber-400 font-bold uppercase tracking-wider block">
-            Gravity Control Vector
+          <span className="text-xs font-mono text-amber-400 font-bold uppercase tracking-wider block text-center">
+            Demon Gravity Control Pad
           </span>
 
-          <div className="flex flex-col items-center gap-2">
+          <div className="grid grid-cols-3 gap-2 max-w-[280px] mx-auto">
+            <button
+              onClick={() => shiftGravity('LEFT_UP')}
+              title="Up-Left (↖)"
+              className={`p-2.5 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
+                gravityDir === 'LEFT_UP'
+                  ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              <span>↖</span>
+              <span className="text-[9px] text-zinc-400">UP-LEFT</span>
+            </button>
+
             <button
               onClick={() => shiftGravity('UP')}
-              className={`p-3 rounded-xl border font-mono font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              title="Gravity Up (↑)"
+              className={`p-2.5 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
                 gravityDir === 'UP'
                   ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
-                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-500'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800'
               }`}
             >
               <ArrowUp className="w-4 h-4 text-red-400" />
-              GRAVITY UP (↑ / W)
+              <span className="text-[9px] text-zinc-400">UP (W)</span>
             </button>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => shiftGravity('LEFT')}
-                className={`p-3 rounded-xl border font-mono font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                  gravityDir === 'LEFT'
-                    ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
-                    : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-500'
-                }`}
-              >
-                <ArrowLeft className="w-4 h-4 text-blue-400" />
-                LEFT (← / A)
-              </button>
+            <button
+              onClick={() => shiftGravity('RIGHT_UP')}
+              title="Up-Right (↗)"
+              className={`p-2.5 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
+                gravityDir === 'RIGHT_UP'
+                  ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              <span>↗</span>
+              <span className="text-[9px] text-zinc-400">UP-RIGHT</span>
+            </button>
 
-              <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-              </div>
+            <button
+              onClick={() => shiftGravity('LEFT')}
+              title="Left (←)"
+              className={`p-2.5 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
+                gravityDir === 'LEFT'
+                  ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              <ArrowLeft className="w-4 h-4 text-blue-400" />
+              <span className="text-[9px] text-zinc-400">LEFT (A)</span>
+            </button>
 
-              <button
-                onClick={() => shiftGravity('RIGHT')}
-                className={`p-3 rounded-xl border font-mono font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                  gravityDir === 'RIGHT'
-                    ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
-                    : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-500'
-                }`}
-              >
-                RIGHT (→ / D)
-                <ArrowRight className="w-4 h-4 text-emerald-400" />
-              </button>
+            <div className="w-full h-full rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center text-2xl shadow-inner">
+              👹
             </div>
+
+            <button
+              onClick={() => shiftGravity('RIGHT')}
+              title="Right (→)"
+              className={`p-2.5 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
+                gravityDir === 'RIGHT'
+                  ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              <ArrowRight className="w-4 h-4 text-emerald-400" />
+              <span className="text-[9px] text-zinc-400">RIGHT (D)</span>
+            </button>
+
+            <button
+              onClick={() => shiftGravity('LEFT_DOWN')}
+              title="Left Down (↙)"
+              className={`p-2.5 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
+                gravityDir === 'LEFT_DOWN'
+                  ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              <span>↙</span>
+              <span className="text-[9px] text-zinc-400">LEFT-DOWN</span>
+            </button>
 
             <button
               onClick={() => shiftGravity('DOWN')}
-              className={`p-3 rounded-xl border font-mono font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              title="Gravity Down (↓)"
+              className={`p-2.5 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
                 gravityDir === 'DOWN'
                   ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
-                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-500'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800'
               }`}
             >
               <ArrowDown className="w-4 h-4 text-purple-400" />
-              GRAVITY DOWN (↓ / S)
+              <span className="text-[9px] text-zinc-400">DOWN (S)</span>
+            </button>
+
+            <button
+              onClick={() => shiftGravity('RIGHT_DOWN')}
+              title="Right Down (↘)"
+              className={`p-2.5 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
+                gravityDir === 'RIGHT_DOWN'
+                  ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/50'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              <span>↘</span>
+              <span className="text-[9px] text-zinc-400">RIGHT-DOWN</span>
             </button>
           </div>
 
-          {/* Progress bar */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-[10px] font-mono text-zinc-500">
-              <span>Key Progress</span>
-              <span>{collectedKeys}/{totalKeys}</span>
-            </div>
-            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-amber-500 rounded-full transition-all duration-500"
-                style={{ width: totalKeys > 0 ? `${(collectedKeys / totalKeys) * 100}%` : '0%' }}
-              />
-            </div>
-          </div>
-
-          <div className="pt-2 flex items-center justify-between border-t border-zinc-800">
+          <div className="pt-2 flex items-center justify-center border-t border-zinc-800">
             <button
               onClick={handleReset}
-              className="flex items-center gap-1 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Reset Level
-            </button>
-            <button
-              onClick={() => setShowHint(!showHint)}
-              className="flex items-center gap-1 text-xs font-mono text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-              {showHint ? 'Hide Hint' : 'Show Hint'}
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+              Reset Chamber
             </button>
           </div>
-
-          {showHint && (
-            <div className="p-3 bg-amber-950/40 border border-amber-800/40 rounded-xl text-xs font-mono text-amber-300 space-y-1">
-              <p>💡 <strong>Hint:</strong> {HINTS[chamberId] ?? HINTS[1]}</p>
-              <button
-                onClick={handleAutoSolve}
-                className="mt-1 text-[11px] underline text-amber-400 hover:text-white cursor-pointer"
-              >
-                Overpower Anti-Gravity Core (Auto Solve)
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

@@ -37,15 +37,7 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
   }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.currentLevel, state.totalTimeElapsed]);
 
   const handleReturnToLobby = () => {
-    // Reset state to lobby but keep team names and code
-    gameSync.updateState({
-      ...INITIAL_GAME_STATE,
-      teamCode: state.teamCode,
-      teamName: state.teamName,
-      player1Name: state.player1Name,
-      player2Name: state.player2Name,
-      gameStatus: 'lobby',
-    });
+    gameSync.resetGame();
     router.push('/');
   };
 

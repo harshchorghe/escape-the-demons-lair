@@ -241,28 +241,98 @@ class GameSyncManager {
     return this.currentState;
   }
 
-  public updateState(updater: Partial<GameGameState> | ((prev: GameGameState) => Partial<GameGameState>)) {
-    const partialUpdate = typeof updater === 'function' ? updater(this.currentState) : updater;
-    const newState = {
-      ...this.currentState,
-      ...partialUpdate,
-      l3DemonsDefeated: partialUpdate.l3DemonsDefeated !== undefined
-        ? Math.max(this.currentState.l3DemonsDefeated || 0, partialUpdate.l3DemonsDefeated)
-        : (this.currentState.l3DemonsDefeated || 0),
-      l1CompletedRooms: partialUpdate.l1CompletedRooms !== undefined 
-        ? partialUpdate.l1CompletedRooms 
-        : (this.currentState.l1CompletedRooms || []),
-      l1FailedRooms: partialUpdate.l1FailedRooms !== undefined 
-        ? partialUpdate.l1FailedRooms 
-        : (this.currentState.l1FailedRooms || []),
-      l2UnlockedDoors: partialUpdate.l2UnlockedDoors !== undefined 
-        ? partialUpdate.l2UnlockedDoors 
-        : (this.currentState.l2UnlockedDoors || []),
-      l3DestroyedCrystals: partialUpdate.l3DestroyedCrystals !== undefined 
-        ? partialUpdate.l3DestroyedCrystals 
-        : (this.currentState.l3DestroyedCrystals || []),
+  public resetGame(freshOverrides?: Partial<GameGameState>) {
+    if (this.firebaseUnsubscribe) {
+      this.firebaseUnsubscribe();
+      this.firebaseUnsubscribe = null;
+    }
+    this.activeFirebaseTeamCode = null;
+
+    const newState: GameGameState = {
+      ...INITIAL_GAME_STATE,
+      ...freshOverrides,
+      l1CompletedRooms: freshOverrides?.l1CompletedRooms || [],
+      l1FailedRooms: freshOverrides?.l1FailedRooms || [],
+      l1IsCompleted: freshOverrides?.l1IsCompleted || false,
+      l2UnlockedDoors: freshOverrides?.l2UnlockedDoors || [],
+      l3DestroyedCrystals: freshOverrides?.l3DestroyedCrystals || [],
+      l3DemonsDefeated: freshOverrides?.l3DemonsDefeated || 0,
+      l3TotalDemons: 50,
+      l3TimeElapsed: 0,
+      totalTimeElapsed: 0,
+      timePenalties: 0,
+      currentLevel: freshOverrides?.currentLevel || 1,
+      gameStatus: freshOverrides?.gameStatus || 'lobby',
       lastUpdated: Date.now(),
     };
+
+    this.currentState = newState;
+    this.saveToSession(newState);
+
+    if (newState.teamCode) {
+      this.syncFirebaseSubscription(newState.teamCode);
+    }
+
+    if (this.channel) {
+      this.channel.postMessage({ type: 'STATE_UPDATE', state: newState });
+    }
+
+    if (isFirebaseInitialized && db && newState.teamCode) {
+      try {
+        setDoc(doc(db, 'rooms', newState.teamCode), newState, { merge: false });
+      } catch (e) {
+        console.warn("Firebase reset team state error:", e);
+      }
+    }
+
+    this.notifyListeners();
+  }
+
+  public updateState(updater: Partial<GameGameState> | ((prev: GameGameState) => Partial<GameGameState>)) {
+    const partialUpdate = typeof updater === 'function' ? updater(this.currentState) : updater;
+
+    const isNewTeam = (partialUpdate.teamCode && partialUpdate.teamCode !== this.currentState.teamCode) || (partialUpdate.gameStatus === 'lobby' && this.currentState.gameStatus !== 'lobby');
+
+    let newState: GameGameState;
+    if (isNewTeam) {
+      newState = {
+        ...INITIAL_GAME_STATE,
+        ...partialUpdate,
+        l1CompletedRooms: partialUpdate.l1CompletedRooms !== undefined ? partialUpdate.l1CompletedRooms : [],
+        l1FailedRooms: partialUpdate.l1FailedRooms !== undefined ? partialUpdate.l1FailedRooms : [],
+        l1IsCompleted: partialUpdate.l1IsCompleted !== undefined ? partialUpdate.l1IsCompleted : false,
+        l2UnlockedDoors: partialUpdate.l2UnlockedDoors !== undefined ? partialUpdate.l2UnlockedDoors : [],
+        l3DestroyedCrystals: partialUpdate.l3DestroyedCrystals !== undefined ? partialUpdate.l3DestroyedCrystals : [],
+        l3DemonsDefeated: partialUpdate.l3DemonsDefeated !== undefined ? partialUpdate.l3DemonsDefeated : 0,
+        l3TotalDemons: 50,
+        l3TimeElapsed: 0,
+        totalTimeElapsed: 0,
+        timePenalties: 0,
+        currentLevel: partialUpdate.currentLevel || 1,
+        lastUpdated: Date.now(),
+      };
+    } else {
+      newState = {
+        ...this.currentState,
+        ...partialUpdate,
+        l3DemonsDefeated: partialUpdate.l3DemonsDefeated !== undefined
+          ? Math.max(this.currentState.l3DemonsDefeated || 0, partialUpdate.l3DemonsDefeated)
+          : (this.currentState.l3DemonsDefeated || 0),
+        l1CompletedRooms: partialUpdate.l1CompletedRooms !== undefined 
+          ? partialUpdate.l1CompletedRooms 
+          : (this.currentState.l1CompletedRooms || []),
+        l1FailedRooms: partialUpdate.l1FailedRooms !== undefined 
+          ? partialUpdate.l1FailedRooms 
+          : (this.currentState.l1FailedRooms || []),
+        l2UnlockedDoors: partialUpdate.l2UnlockedDoors !== undefined 
+          ? partialUpdate.l2UnlockedDoors 
+          : (this.currentState.l2UnlockedDoors || []),
+        l3DestroyedCrystals: partialUpdate.l3DestroyedCrystals !== undefined 
+          ? partialUpdate.l3DestroyedCrystals 
+          : (this.currentState.l3DestroyedCrystals || []),
+        lastUpdated: Date.now(),
+      };
+    }
     
     this.currentState = newState;
     this.saveToSession(newState);
@@ -279,7 +349,6 @@ class GameSyncManager {
     // Broadcast to Firebase if available
     if (isFirebaseInitialized && db && newState.teamCode) {
       try {
-        // Only send the fields that actually changed (plus lastUpdated) to prevent race conditions!
         const firestorePayload = { ...partialUpdate, lastUpdated: newState.lastUpdated };
         setDoc(doc(db, 'rooms', newState.teamCode), firestorePayload, { merge: true });
       } catch (e) {

@@ -56,20 +56,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
   };
 
   const handlePlayAgain = () => {
-    gameSync.updateState({
-      gameStatus: 'lobby',
-      teamCode: '',
-      currentLevel: 1,
-      l1CompletedRooms: [],
-      l2UnlockedDoors: [],
-      l3DestroyedCrystals: [],
-      collectedSealFragments: 0,
-      selectedSeal: null,
-      isDemonSealed: false,
-      l3TimeElapsed: 0,
-      totalTimeElapsed: 0,
-      timePenalties: 0,
-    });
+    gameSync.resetGame();
   };
 
   return (

@@ -222,35 +222,15 @@ export const RubiksCubePuzzle: React.FC<RubiksCubePuzzleProps> = ({ onSolve }) =
             </button>
           </div>
 
-          <div className="pt-2 flex items-center justify-between border-t border-zinc-800">
+          <div className="pt-2 flex items-center justify-center border-t border-zinc-800">
             <button
               onClick={handleReset}
-              className="flex items-center gap-1 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
               Reset Scramble
             </button>
-
-            <button
-              onClick={() => setShowHint(!showHint)}
-              className="flex items-center gap-1 text-xs font-mono text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-              {showHint ? 'Hide Hint' : 'Show Hint'}
-            </button>
           </div>
-
-          {showHint && (
-            <div className="p-3 bg-amber-950/40 border border-amber-800/40 rounded-xl text-xs font-mono text-amber-300 space-y-1">
-              <p>💡 <strong>Hint:</strong> Shift Top Row → then Rotate Face Clockwise on Front face twice to line up all matching colors!</p>
-              <button
-                onClick={handleAutoSolve}
-                className="mt-1 text-[11px] underline text-amber-400 hover:text-white cursor-pointer"
-              >
-                Instant Altar Channeling (Auto Solve)
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
