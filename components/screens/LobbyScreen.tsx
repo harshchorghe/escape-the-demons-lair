@@ -56,7 +56,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     setErrorMsg('');
     const code = generateTeamCode();
     setMyRole('player1');
-    gameSync.updateState({
+    gameSync.resetGame({
       teamCode: code,
       teamName: teamNameInput.trim(),
       player1Name: player1Input.trim(),
