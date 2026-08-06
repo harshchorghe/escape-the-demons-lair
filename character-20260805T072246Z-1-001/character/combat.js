@@ -141,7 +141,7 @@ export class CombatEngine {
     this.character.setState('slash');
     sound.playSlashSound();
 
-    this.checkHitOnDemon(25, false);
+    this.checkHitOnDemon(50, false);
     this.registerCombo();
   }
 
@@ -298,7 +298,7 @@ export class CombatEngine {
   demonAttackPlayer() {
     if (this.playerHp <= 0) return;
 
-    const damage = 15;
+    const damage = 50;
 
     if (this.isBlocking) {
       const blockedDamage = Math.round(damage * 0.25);

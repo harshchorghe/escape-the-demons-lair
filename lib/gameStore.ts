@@ -30,8 +30,8 @@ export interface GameGameState {
   timeRemaining: number;
   totalTimeElapsed: number;
   timePenalties: number;
-  l3DemonsDefeated: number; // Demons defeated in Level 3 out of 50
-  l3TotalDemons: number; // Target demons (50)
+  l3DemonsDefeated: number; // Demons defeated in Level 3 out of 75
+  l3TotalDemons: number; // Target demons (75)
   l3TimeElapsed: number; // Level 3 only timer for leaderboard ranking
   l3DemonHp: number; // Demon Lord current HP
   l3MaxDemonHp: number; // Demon Lord max HP (500)
@@ -71,7 +71,7 @@ export const INITIAL_GAME_STATE: GameGameState = {
   totalTimeElapsed: 0,
   timePenalties: 0,
   l3DemonsDefeated: 0,
-  l3TotalDemons: 50,
+  l3TotalDemons: 75,
   l3TimeElapsed: 0,
   l3DemonHp: 500,
   l3MaxDemonHp: 500,
