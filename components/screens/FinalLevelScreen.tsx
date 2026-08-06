@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { GameGameState, gameSync } from "@/lib/gameStore";
 import { DemonSlayerCharacter } from "@/components/level3/DemonSlayerCharacter";
 import { EffectsEngine } from "@/components/level3/EffectsEngine";
@@ -63,10 +64,10 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // 1. Scene & Fog
+    // 1. Scene & Fog — Crimson Demon Throne Room
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x06060e);
-    scene.fog = new THREE.FogExp2(0x080814, 0.028);
+    scene.background = new THREE.Color(0x1a0000);
+    scene.fog = new THREE.FogExp2(0x330800, 0.032);
 
     // 2. Camera
     const camera = new THREE.PerspectiveCamera(52, width / height, 0.05, 120);
@@ -97,19 +98,56 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     controls.minDistance = 3;
     controls.maxDistance = 15;
 
-    // 5. Environment & Lights
-    buildArena(scene);
-    buildSkySphere(scene);
+    // 5. Environment, Lights & Atmosphere
+    const { demonFire, floorGlow } = buildArena(scene);
+    const embers = buildSkySphere(scene);
 
-    // 6. Character & Partner Character for Duo Arena
-    const character = new DemonSlayerCharacter(scene);
+    // Load tatami.glb as arena floor — replaces the primitive CylinderGeometry floor
+    let tatamiModel: THREE.Group | null = null;
+    let isMounted = true;
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('/models/tatami.glb', (gltf) => {
+      if (!isMounted) return;
+      const model = gltf.scene;
+      // Compute bounds for centering and scaling
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      // Center at world origin horizontally
+      model.position.x = -center.x;
+      model.position.z = -center.z;
+      // Scale so the longest horizontal axis fills ~32 units (matches old radius-16 arena)
+      const scaleFactor = 32 / Math.max(size.x, size.z);
+      model.scale.setScalar(scaleFactor);
+      // Force matrix update AFTER scale so the bounding box reflects actual world coords
+      model.updateMatrixWorld(true);
+      const scaledBox = new THREE.Box3().setFromObject(model);
+      // Lift so top surface sits at y = 0 (players stand on top)
+      model.position.y = -scaledBox.max.y;
+      // Enable shadows on every mesh in the hierarchy
+      model.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      tatamiModel = model;
+      scene.add(model);
+    });
+
+
+    // 6. Character & Partner Character for Duo Arena (GLB Player Models)
+    const p1ModelUrl = myRole === 'player1' ? '/models/player1.glb' : '/models/player2.glb';
+    const p2ModelUrl = myRole === 'player1' ? '/models/player2.glb' : '/models/player1.glb';
+
+    const character = new DemonSlayerCharacter(scene, p1ModelUrl);
     if (myRole === 'player2') {
       character.setBreathingStyle('thunder');
     }
     characterRef.current = character;
 
     // Partner Character in scene for co-op feel
-    const partnerCharacter = new DemonSlayerCharacter(scene);
+    const partnerCharacter = new DemonSlayerCharacter(scene, p2ModelUrl);
     partnerCharacter.group.position.set(myRole === 'player1' ? 1.8 : -1.8, 0, 0);
     partnerCharacter.setBreathingStyle(myRole === 'player1' ? 'thunder' : 'water');
 
@@ -159,7 +197,8 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
           });
         }
       },
-      state.l3DemonsDefeated || 0
+      state.l3DemonsDefeated || 0,
+      partnerCharacter
     );
     combatRef.current = combat;
 
@@ -219,12 +258,14 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     const clock = new THREE.Clock();
     let animFrameId: number;
     let frameCounter = 0;
+    let elapsedTime = 0;
 
     const animate = () => {
       animFrameId = requestAnimationFrame(animate);
       frameCounter++;
 
       const deltaTime = Math.min(clock.getDelta(), 0.1);
+      elapsedTime += deltaTime;
 
       const moveDir = new THREE.Vector3();
       if (keys.w || keys.ArrowUp) moveDir.z -= 1;
@@ -290,6 +331,19 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       effects.update(deltaTime);
       combat.update(deltaTime);
 
+      // Animate ember particles — drift upward, wrap at top
+      if (embers) {
+        const ePos = embers.geometry.attributes.position.array as Float32Array;
+        for (let ei = 0; ei < ePos.length; ei += 3) {
+          ePos[ei + 1] += deltaTime * 1.2;
+          if (ePos[ei + 1] > 20) ePos[ei + 1] = -3;
+        }
+        embers.geometry.attributes.position.needsUpdate = true;
+      }
+      // Pulse demon fire lights for a flickering flame effect
+      demonFire.intensity = 4 + Math.sin(elapsedTime * 3.5) * 1.5;
+      floorGlow.intensity = 3 + Math.sin(elapsedTime * 2.8 + 1.2) * 1.0;
+
       const charPos = character.group.position;
       controls.target.lerp(new THREE.Vector3(charPos.x, charPos.y + 1.2, charPos.z), 0.1);
       controls.update();
@@ -301,11 +355,15 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 
     // Clean up
     return () => {
+      isMounted = false;
+      if (tatamiModel) scene.remove(tatamiModel);
       cancelAnimationFrame(animFrameId);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
       renderer.domElement.removeEventListener('click', handleCanvasClick);
+      character.dispose();
+      partnerCharacter.dispose();
       effects.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
@@ -731,58 +789,46 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 };
 
 // ── Arena Builder Helpers
-function buildArena(scene: THREE.Scene) {
-  const ambient = new THREE.AmbientLight(0x151828, 0.5);
+function buildArena(scene: THREE.Scene): { demonFire: THREE.PointLight; floorGlow: THREE.PointLight } {
+  // 1. Soft Warm Ambient Light (preserves dark red background while illuminating models clearly)
+  const ambient = new THREE.AmbientLight(0xffe2d0, 1.4);
   scene.add(ambient);
 
-  const moonKey = new THREE.DirectionalLight(0x8cb4f0, 2.2);
-  moonKey.position.set(8, 18, 12);
-  moonKey.castShadow = true;
-  moonKey.shadow.mapSize.width = 2048;
-  moonKey.shadow.mapSize.height = 2048;
-  moonKey.shadow.bias = -0.0002;
-  scene.add(moonKey);
+  // 2. Key Directional Light (from front/top, warm golden-orange, casts crisp soft shadows)
+  const fireKey = new THREE.DirectionalLight(0xffd5a6, 2.6);
+  fireKey.position.set(6, 16, 10);
+  fireKey.castShadow = true;
+  fireKey.shadow.mapSize.width = 2048;
+  fireKey.shadow.mapSize.height = 2048;
+  fireKey.shadow.bias = -0.0002;
+  scene.add(fireKey);
 
-  const fillLight = new THREE.DirectionalLight(0xffa050, 0.55);
-  fillLight.position.set(-6, 1.5, 5);
-  scene.add(fillLight);
+  // 3. Hemisphere Fill Light (warm sky glow / deep orange ground fill for clear visibility without flat shading)
+  const fillHemi = new THREE.HemisphereLight(0xffbe88, 0x661800, 1.4);
+  fillHemi.position.set(0, 18, 0);
+  scene.add(fillHemi);
 
-  const rimLight = new THREE.DirectionalLight(0x00e8d2, 1.4);
-  rimLight.position.set(0, 4, -9);
+  // 4. Rim Light (from behind for silhouette depth and separation from background)
+  const rimLight = new THREE.DirectionalLight(0xff5500, 1.8);
+  rimLight.position.set(0, 6, -12);
   scene.add(rimLight);
 
-  const charSpot = new THREE.SpotLight(0xffd0a0, 2.2, 14, Math.PI * 0.18, 0.55, 1.2);
-  charSpot.position.set(0, 9, 2);
+  // Pulsing demon fire behind throne
+  const demonFire = new THREE.PointLight(0xff3300, 4.5, 22);
+  demonFire.position.set(0, 4, -9);
+  scene.add(demonFire);
+
+  // Ground-level orange glow simulating floor fire
+  const floorGlow = new THREE.PointLight(0xff7700, 3.5, 20);
+  floorGlow.position.set(0, 0.8, 3);
+  scene.add(floorGlow);
+
+  // Warm character & enemy overhead spotlight
+  const charSpot = new THREE.SpotLight(0xffe8d0, 2.5, 18, Math.PI * 0.22, 0.5, 1.0);
+  charSpot.position.set(0, 10, 3);
   charSpot.target.position.set(0, 0.8, 0);
   scene.add(charSpot);
   scene.add(charSpot.target);
-
-  const groundGeo = new THREE.CylinderGeometry(16, 17, 0.5, 48, 4);
-  const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x0e0e1a,
-    roughness: 0.45,
-    metalness: 0.35,
-    envMapIntensity: 0.8,
-  });
-  const ground = new THREE.Mesh(groundGeo, groundMat);
-  ground.position.y = -0.25;
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  for (let i = 0; i < 3; i++) {
-    const r1 = 4 + i * 3.5;
-    const rGeo = new THREE.RingGeometry(r1, r1 + 0.06, 48);
-    const rMat = new THREE.MeshBasicMaterial({
-      color: i === 0 ? 0x00d2ff : 0x334455,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: i === 0 ? 0.55 : 0.2,
-    });
-    const ring = new THREE.Mesh(rGeo, rMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.01;
-    scene.add(ring);
-  }
 
   buildToriiGate(scene, 0, 0, -12);
   buildLantern(scene, -6, 0, -8);
@@ -791,32 +837,51 @@ function buildArena(scene: THREE.Scene) {
   buildLantern(scene, 8, 0, 4);
   buildLantern(scene, -4, 0, 8);
   buildLantern(scene, 4, 0, 8);
+
+  return { demonFire, floorGlow };
 }
 
-function buildSkySphere(scene: THREE.Scene) {
+function buildSkySphere(scene: THREE.Scene): THREE.Points {
+  // Dark crimson sky — no blue, no stars, burning throne room atmosphere
   const skyGeo = new THREE.SphereGeometry(80, 32, 32);
   const skyMat = new THREE.MeshBasicMaterial({
-    color: 0x04040e,
+    color: 0x150000,
     side: THREE.BackSide,
   });
   const sky = new THREE.Mesh(skyGeo, skyMat);
   scene.add(sky);
 
-  const starGeo = new THREE.BufferGeometry();
-  const starCount = 1200;
-  const positions = new Float32Array(starCount * 3);
-  for (let i = 0; i < starCount * 3; i++) {
-    positions[i] = (Math.random() - 0.5) * 160;
+  // Ember particle system — 200 floating orange/red particles drifting upward
+  const emberCount = 200;
+  const emberGeo = new THREE.BufferGeometry();
+  const emberPos = new Float32Array(emberCount * 3);
+  const emberCol = new Float32Array(emberCount * 3);
+
+  for (let i = 0; i < emberCount; i++) {
+    emberPos[i * 3]     = (Math.random() - 0.5) * 30; // x
+    emberPos[i * 3 + 1] = Math.random() * 22 - 3;      // y: -3 to 19
+    emberPos[i * 3 + 2] = (Math.random() - 0.5) * 30; // z
+    const t = Math.random();
+    emberCol[i * 3]     = 1.0;              // R always full
+    emberCol[i * 3 + 1] = 0.15 + t * 0.45; // G: 0.15–0.60 (orange → yellow)
+    emberCol[i * 3 + 2] = 0.0;             // B none
   }
-  starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const starMat = new THREE.PointsMaterial({
-    color: 0xffffff,
-    size: 0.12,
+
+  emberGeo.setAttribute('position', new THREE.BufferAttribute(emberPos, 3));
+  emberGeo.setAttribute('color',    new THREE.BufferAttribute(emberCol, 3));
+
+  const emberMat = new THREE.PointsMaterial({
+    size: 0.07,
+    vertexColors: true,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.9,
+    sizeAttenuation: true,
   });
-  const stars = new THREE.Points(starGeo, starMat);
-  scene.add(stars);
+
+  const embers = new THREE.Points(emberGeo, emberMat);
+  scene.add(embers);
+
+  return embers;
 }
 
 function buildToriiGate(scene: THREE.Scene, x: number, y: number, z: number) {

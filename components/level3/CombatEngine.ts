@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DemonSlayerCharacter } from './DemonSlayerCharacter';
 import { EffectsEngine } from './EffectsEngine';
+import { DemonModel } from './DemonModel';
 import { sound } from './SoundSynthesizer';
 import { gameSync } from '@/lib/gameStore';
 
@@ -45,14 +46,19 @@ export class CombatEngine {
   public comboTimer: NodeJS.Timeout | null = null;
   public isBlocking: boolean = false;
 
-  // Demon Target Enemy
+  // Target Enemy State
+  public partnerCharacter?: DemonSlayerCharacter;
+  public currentTargetPlayer: 'p1' | 'p2' = 'p1';
+  private demonDeathTimer: NodeJS.Timeout | null = null;
+
   public demon: {
     group: THREE.Group;
-    torso: THREE.Mesh;
-    head: THREE.Mesh;
-    leftArm: THREE.Mesh;
-    rightArm: THREE.Mesh;
+    torso: THREE.Object3D;   // dummy – kept for legacy bob animation compat
+    head: THREE.Object3D;    // dummy – retained for type compat
+    leftArm: THREE.Object3D; // dummy – retained for type compat
+    rightArm: THREE.Object3D;// dummy – retained for type compat
     position: THREE.Vector3;
+    model: DemonModel;       // the actual GLB model controller
   } | null = null;
   public demonHp: number = 150;
   public demonMaxHp: number = 150;
@@ -68,10 +74,12 @@ export class CombatEngine {
     character: DemonSlayerCharacter,
     effectsEngine: EffectsEngine,
     callbacks: CombatCallbacks = {},
-    initialDemonsDefeated: number = 0
+    initialDemonsDefeated: number = 0,
+    partnerCharacter?: DemonSlayerCharacter
   ) {
     this.scene = scene;
     this.character = character;
+    this.partnerCharacter = partnerCharacter;
     this.effects = effectsEngine;
     this.callbacks = callbacks;
     this.demonsDefeated = initialDemonsDefeated;
@@ -120,86 +128,46 @@ export class CombatEngine {
 
   // --- DEMON ENEMY TARGET CREATION ---
   spawnDemonTarget() {
-    if (this.demon) {
-      this.scene.remove(this.demon.group);
+    // Clear pending death timer if any
+    if (this.demonDeathTimer) {
+      clearTimeout(this.demonDeathTimer);
+      this.demonDeathTimer = null;
     }
 
-    const group = new THREE.Group();
+    // Dispose previous demon if any
+    if (this.demon) {
+      this.demon.model.dispose();
+      this.demon = null;
+    }
+
     this.demonHp = 150;
     this.demonState = 'idle';
+    this.currentTargetPlayer = 'p1';
 
-    const colors = [0x5c1527, 0x3d174a, 0x1f382a, 0x472212, 0x6e1b1b];
-    const colorIndex = (this.demonsDefeated) % colors.length;
-    const skinMat = new THREE.MeshToonMaterial({ color: colors[colorIndex] });
-    const hornMat = new THREE.MeshStandardMaterial({ color: 0xffea00, roughness: 0.2, metalness: 0.8 });
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    // Create a DemonModel (GLB loader + AnimationMixer wrapper)
+    const demonModel = new DemonModel(this.scene);
 
-    const torsoGeo = new THREE.BoxGeometry(0.6, 0.75, 0.4);
-    const torso = new THREE.Mesh(torsoGeo, skinMat);
-    torso.position.y = 1.1;
-    group.add(torso);
-
-    const shoulderGeo = new THREE.ConeGeometry(0.2, 0.4, 4);
-    const leftShoulder = new THREE.Mesh(shoulderGeo, hornMat);
-    leftShoulder.position.set(0.42, 1.4, 0);
-    leftShoulder.rotation.z = -0.5;
-    group.add(leftShoulder);
-
-    const rightShoulder = new THREE.Mesh(shoulderGeo, hornMat);
-    rightShoulder.position.set(-0.42, 1.4, 0);
-    rightShoulder.rotation.z = 0.5;
-    group.add(rightShoulder);
-
-    const headGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-    const head = new THREE.Mesh(headGeo, skinMat);
-    head.position.y = 1.7;
-    group.add(head);
-
-    const eyeGeo = new THREE.SphereGeometry(0.06, 8, 8);
-    const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-    leftEye.position.set(0.1, 1.75, 0.21);
-    group.add(leftEye);
-
-    const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rightEye.position.set(-0.1, 1.75, 0.21);
-    group.add(rightEye);
-
-    const hornGeo = new THREE.ConeGeometry(0.08, 0.4, 8);
-    const leftHorn = new THREE.Mesh(hornGeo, hornMat);
-    leftHorn.position.set(0.12, 1.98, 0.05);
-    leftHorn.rotation.x = 0.2;
-    group.add(leftHorn);
-
-    const rightHorn = new THREE.Mesh(hornGeo, hornMat);
-    rightHorn.position.set(-0.12, 1.98, 0.05);
-    rightHorn.rotation.x = 0.2;
-    group.add(rightHorn);
-
-    const armGeo = new THREE.CylinderGeometry(0.1, 0.08, 0.7, 8);
-    const leftArm = new THREE.Mesh(armGeo, skinMat);
-    leftArm.position.set(0.4, 1.1, 0);
-    leftArm.rotation.z = -0.3;
-    group.add(leftArm);
-
-    const rightArm = new THREE.Mesh(armGeo, skinMat);
-    rightArm.position.set(-0.4, 1.1, 0);
-    rightArm.rotation.z = 0.3;
-    group.add(rightArm);
-
-    // Randomize position in circle around arena center
+    // Randomise spawn position in a ring around the arena centre
     const angle = Math.random() * Math.PI * 2;
     const radius = 3.5 + Math.random() * 4.5;
-    group.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
-    this.scene.add(group);
+    demonModel.group.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+
+    // Dummy Object3D nodes — kept for backward-compat
+    const dummy = new THREE.Object3D();
+    dummy.position.y = 1.8;
 
     this.demon = {
-      group,
-      torso,
-      head,
-      leftArm,
-      rightArm,
-      position: group.position
+      group:    demonModel.group,
+      torso:    dummy,
+      head:     dummy,
+      leftArm:  dummy,
+      rightArm: dummy,
+      position: demonModel.group.position,
+      model:    demonModel,
     };
+
+    // Load the GLB; scene.add is called inside DemonModel.load() on success
+    demonModel.load('/models/demon.glb');
 
     this.notifyStats();
     this.showAnnouncement(`DEMON #${this.demonsDefeated + 1} SPAWNED!`);
@@ -258,7 +226,7 @@ export class CombatEngine {
   // ⚔️ INSTANT DEFEAT DEMON EXECUTION FINISHER BUTTON ⚔️
   playerExecutionFinisher() {
     if (this.playerHp <= 0) return;
-    if (!this.demon || this.demonHp <= 0) {
+    if (!this.demon || this.demonHp <= 0 || this.demonState === 'dead') {
       this.spawnDemonTarget();
     }
 
@@ -325,7 +293,7 @@ export class CombatEngine {
 
   // --- HIT DETECTION & DAMAGE ---
   checkHitOnDemon(damageAmount: number, isCritical: boolean) {
-    if (!this.demon || this.demonHp <= 0) return;
+    if (!this.demon || this.demonHp <= 0 || this.demonState === 'dead') return;
 
     const charPos = this.character.group.position;
     const demonPos = this.demon.position;
@@ -346,17 +314,28 @@ export class CombatEngine {
 
       if (this.demonHp <= 0) {
         this.demonState = 'dead';
-        
+
+        if (this.demonDeathTimer) {
+          clearTimeout(this.demonDeathTimer);
+        }
+
+        // Play death animation on the GLB model
+        if (this.demon) {
+          this.demon.model.playAnimation('death', false);
+        }
+
+        const deathDurationMs = this.demon ? Math.round(this.demon.model.getDeathDuration() * 1000) : 1200;
+
         // Atomically increment team demon kill count across network & local tabs
         gameSync.updateState((prev) => {
           const nextCount = (prev.l3DemonsDefeated || 0) + 1;
           this.demonsDefeated = nextCount;
           return { l3DemonsDefeated: nextCount };
         });
-        
+
         this.effects.spawnBreathingEffect('flame', demonPos, new THREE.Vector3(0, 1, 0));
         this.effects.spawnBreathingEffect('thunder', demonPos, new THREE.Vector3(0, 1, 0));
-        
+
         if (this.callbacks.onDemonDefeated) {
           this.callbacks.onDemonDefeated(this.demonsDefeated);
         }
@@ -366,15 +345,21 @@ export class CombatEngine {
           if (this.callbacks.onAllDemonsDefeated) {
             this.callbacks.onAllDemonsDefeated();
           }
+          this.demonDeathTimer = setTimeout(() => {
+            if (this.demon) {
+              this.demon.model.dispose();
+              this.demon = null;
+            }
+          }, deathDurationMs);
         } else {
           this.showAnnouncement(`💥 DEMON DEFEATED! (${this.demonsDefeated}/${this.totalDemons})`);
-          setTimeout(() => {
+          this.demonDeathTimer = setTimeout(() => {
             if (this.demon) {
-              this.scene.remove(this.demon.group);
+              this.demon.model.dispose();
               this.demon = null;
             }
             this.spawnDemonTarget();
-          }, 600);
+          }, deathDurationMs);
         }
       }
     }
@@ -384,26 +369,34 @@ export class CombatEngine {
     if (this.playerHp <= 0) return;
 
     const damage = 15;
+    const targetPos = (this.currentTargetPlayer === 'p2' && this.partnerCharacter)
+      ? this.partnerCharacter.group.position
+      : this.character.group.position;
 
-    if (this.isBlocking) {
-      const blockedDamage = Math.round(damage * 0.25);
-      this.playerHp = Math.max(0, this.playerHp - blockedDamage);
-      sound.playBlockSound();
-      this.effects.spawnDamageNumber(blockedDamage, this.character.group.position, false);
-      this.showAnnouncement("PARRIED! -75% DMG");
-    } else {
-      this.playerHp = Math.max(0, this.playerHp - damage);
-      sound.playImpactSound();
-      this.character.setState('hurt');
+    if (this.currentTargetPlayer === 'p1') {
+      if (this.isBlocking) {
+        const blockedDamage = Math.round(damage * 0.25);
+        this.playerHp = Math.max(0, this.playerHp - blockedDamage);
+        sound.playBlockSound();
+        this.effects.spawnDamageNumber(blockedDamage, targetPos, false);
+        this.showAnnouncement("PARRIED! -75% DMG");
+      } else {
+        this.playerHp = Math.max(0, this.playerHp - damage);
+        sound.playImpactSound();
+        this.character.setState('hurt');
 
-      this.triggerDamageFlash();
+        this.triggerDamageFlash();
+        this.effects.spawnDamageNumber(damage, targetPos, true);
 
-      this.effects.spawnDamageNumber(damage, this.character.group.position, true);
-
-      if (this.playerHp <= 0) {
-        this.character.setState('die');
-        this.showAnnouncement("YOU WERE DEFEATED!");
+        if (this.playerHp <= 0) {
+          this.character.setState('die');
+          this.showAnnouncement("YOU WERE DEFEATED!");
+        }
       }
+    } else {
+      // Attacking partner (Player 2)
+      sound.playImpactSound();
+      this.effects.spawnDamageNumber(damage, targetPos, true);
     }
 
     this.notifyStats();
@@ -475,29 +468,96 @@ export class CombatEngine {
       this.notifyStats();
     }
 
-    if (this.demon && this.demonHp > 0 && this.playerHp > 0) {
+    if (this.demon) {
+      // ALWAYS tick GLB AnimationMixer so death / attack / walk animations run frame-by-frame
+      this.demon.model.update(deltaTime);
+
+      // If demon is dead, sink model smoothly into floor during death animation & stop AI
+      if (this.demonState === 'dead' || this.demonHp <= 0) {
+        this.demon.group.position.y = Math.max(-2.5, this.demon.group.position.y - deltaTime * 0.8);
+        return;
+      }
+
       this.demonAnimTime += deltaTime;
-      const charPos = this.character.group.position;
+
+      // ── Target Selection: choose nearest / maintain current target between Player 1 & Player 2
+      const p1Pos = this.character.group.position;
+      const p2Pos = this.partnerCharacter ? this.partnerCharacter.group.position : null;
+
+      let targetPos = p1Pos;
+      let targetDist = this.demon.position.distanceTo(p1Pos);
+
+      if (p2Pos) {
+        const p2Dist = this.demon.position.distanceTo(p2Pos);
+        if (this.currentTargetPlayer === 'p2' && p2Dist < 12.0) {
+          targetPos = p2Pos;
+          targetDist = p2Dist;
+        } else if (this.currentTargetPlayer === 'p1' && targetDist < 12.0) {
+          // Stay on p1
+        } else if (p2Dist < targetDist) {
+          targetPos = p2Pos;
+          targetDist = p2Dist;
+          this.currentTargetPlayer = 'p2';
+        } else {
+          this.currentTargetPlayer = 'p1';
+        }
+      } else {
+        this.currentTargetPlayer = 'p1';
+      }
+
+      // ── Rotation: face target player directly before & during attacks and chase
       const demonPos = this.demon.position;
-      const dist = demonPos.distanceTo(charPos);
+      const dx = targetPos.x - demonPos.x;
+      const dz = targetPos.z - demonPos.z;
 
-      this.demon.group.lookAt(charPos.x, demonPos.y, charPos.z);
+      if (dx * dx + dz * dz > 0.001) {
+        const targetAngle = Math.atan2(dx, dz);
+        let diff = targetAngle - this.demon.group.rotation.y;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        
+        const turnSpeed = 12.0; // Responsive natural turning speed
+        this.demon.group.rotation.y += diff * Math.min(1.0, deltaTime * turnSpeed);
+      }
 
+      // ── AI State & Continuous Attack Loop ─────────────────────────────
       if (this.demonState === 'hurt') {
         if (this.demonAnimTime > 0.3) {
           this.demonState = 'idle';
+          if (!this.demon.model.isAttacking()) {
+            this.demon.model.playAnimation('idle');
+          }
         }
-      } else if (dist > 1.8 && dist < 12.0) {
+      } else if (targetDist > 1.8 && targetDist < 12.0) {
         this.demonState = 'chase';
-        const moveDir = charPos.clone().sub(demonPos).normalize();
+        const moveDir = targetPos.clone().sub(demonPos).normalize();
         demonPos.addScaledVector(moveDir, deltaTime * 2.2);
 
+        // Keep inside arena bounds
+        if (demonPos.length() > 13.5) {
+          demonPos.setLength(13.5);
+        }
+
+        // Legacy bob (moves dummy torso for compatibility)
         this.demon.torso.position.y = 1.1 + Math.sin(this.demonAnimTime * 8) * 0.05;
-      } else if (dist <= 1.8) {
+
+        // Drive walk animation if not currently finishing an attack swing
+        if (!this.demon.model.isAttacking()) {
+          this.demon.model.playAnimation('walk');
+        }
+      } else if (targetDist <= 1.8) {
         this.demonAttackCooldown -= deltaTime;
         if (this.demonAttackCooldown <= 0) {
+          // Trigger Attack animation (plays fully)
+          this.demon.model.playAnimation('attack', false);
           this.demonAttackPlayer();
-          this.demonAttackCooldown = 2.2;
+          this.demonAttackCooldown = 1.8; // Reset attack cooldown for continuous attacks
+        } else if (!this.demon.model.isAttacking()) {
+          this.demon.model.playAnimation('idle');
+        }
+      } else {
+        if (!this.demon.model.isAttacking()) {
+          this.demon.model.playAnimation('idle');
         }
       }
     }

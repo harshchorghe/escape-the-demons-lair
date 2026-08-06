@@ -59,9 +59,9 @@ export default function Level2Page() {
   return (
     <div className="relative min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-purple-900 selection:text-white font-sans overflow-hidden">
       {/* Background Video for Level 2 */}
-      <div className="fixed inset-0 z-0 opacity-40 pointer-events-none">
+      <div className="fixed inset-0 z-0 opacity-70 pointer-events-none">
         <BackgroundVideo src="/videos/level_2.mp4" />
-        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/80 via-zinc-950/60 to-zinc-950/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/40 via-zinc-950/20 to-zinc-950/50" />
       </div>
 
       <div className="relative z-10 flex flex-col min-h-screen">
