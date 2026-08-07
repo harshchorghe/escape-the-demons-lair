@@ -368,14 +368,10 @@ export class CombatEngine {
   demonAttackPlayer() {
     if (this.playerHp <= 0) return;
 
-<<<<<<< HEAD
     const damage = 15;
     const targetPos = (this.currentTargetPlayer === 'p2' && this.partnerCharacter)
       ? this.partnerCharacter.group.position
       : this.character.group.position;
-=======
-    const damage = 50;
->>>>>>> main
 
     if (this.currentTargetPlayer === 'p1') {
       if (this.isBlocking) {
