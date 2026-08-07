@@ -18,7 +18,7 @@ const ROOM_COLOR = "from-red-900/40 to-red-950/60 border-red-700/50 hover:border
 
 export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   const [rooms, setRooms] = useState<Level1RoomData[]>(FALLBACK_L1_ROOMS);
-  const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(1); // Auto-start room 1 directly
   const [roomTimer, setRoomTimer] = useState<number>(90);
   const [feedback, setFeedback] = useState<{ success?: boolean; message: string }>({ message: '' });
   const [submitting, setSubmitting] = useState(false);
