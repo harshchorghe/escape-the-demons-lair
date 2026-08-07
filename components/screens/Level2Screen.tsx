@@ -709,19 +709,25 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
 
       // --- 2. Canvas Rendering ---
       
-      // Draw Sky background gradient
+      // Draw Sky background gradient — dramatic sunset palette
       const skyGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-      skyGrad.addColorStop(0, '#0284c7'); // sky-500 deep
-      skyGrad.addColorStop(0.6, '#38bdf8'); // sky-400 light
-      skyGrad.addColorStop(0.9, '#e0f2fe'); // sky-100 near horizon
+      skyGrad.addColorStop(0,    '#1a0a2e'); // deep indigo-purple top
+      skyGrad.addColorStop(0.18, '#3d1053'); // violet-purple
+      skyGrad.addColorStop(0.35, '#8b2252'); // deep magenta-pink
+      skyGrad.addColorStop(0.52, '#c94040'); // salmon-crimson
+      skyGrad.addColorStop(0.68, '#e8521a'); // fiery orange-red
+      skyGrad.addColorStop(0.82, '#f07010'); // deep amber-orange
+      skyGrad.addColorStop(0.93, '#f5a020'); // warm golden amber
+      skyGrad.addColorStop(1,    '#f0c040'); // bright horizon gold
       ctx.fillStyle = skyGrad;
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // Draw Parallax clouds
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      // Draw Parallax clouds — warm sunset-tinted wisps
       const cloudX = bgScrollXRef.current;
       for (let offset = 0; offset <= 1; offset++) {
         const cx = cloudX + offset * CANVAS_WIDTH;
+        // Upper cool violet-pink cloud streak
+        ctx.fillStyle = 'rgba(200, 140, 180, 0.30)';
         ctx.beginPath();
         ctx.arc(cx + 40, 70, 20, 0, Math.PI * 2);
         ctx.arc(cx + 65, 60, 28, 0, Math.PI * 2);
@@ -729,6 +735,8 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
         ctx.arc(cx + 65, 80, 15, 0, Math.PI * 2);
         ctx.fill();
 
+        // Mid warm orange-pink cloud streak
+        ctx.fillStyle = 'rgba(255, 180, 100, 0.28)';
         ctx.beginPath();
         ctx.arc(cx + 250, 110, 15, 0, Math.PI * 2);
         ctx.arc(cx + 270, 100, 22, 0, Math.PI * 2);
@@ -736,16 +744,24 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
         ctx.fill();
       }
 
-      // Draw Distant Mountain & Mist Silhouette
+      // Draw Distant Mountain Silhouettes — deep purple dusk
       const bgX = bgScrollXRef.current * 0.4;
       for (let offset = 0; offset <= 1; offset++) {
         const mx = (bgX + offset * CANVAS_WIDTH) % (CANVAS_WIDTH * 2);
-        // Distant soft blue mountain curve
-        ctx.fillStyle = 'rgba(71, 85, 105, 0.35)'; // Slate mist mountain
+        // Furthest mountain — darkest silhouette
+        ctx.fillStyle = 'rgba(30, 10, 50, 0.70)';
         ctx.beginPath();
         ctx.moveTo(mx - 40, CANVAS_HEIGHT - GROUND_HEIGHT);
         ctx.quadraticCurveTo(mx + 80, CANVAS_HEIGHT - GROUND_HEIGHT - 90, mx + 200, CANVAS_HEIGHT - GROUND_HEIGHT);
         ctx.quadraticCurveTo(mx + 300, CANVAS_HEIGHT - GROUND_HEIGHT - 120, mx + 440, CANVAS_HEIGHT - GROUND_HEIGHT);
+        ctx.closePath();
+        ctx.fill();
+        // Nearer ridge — slightly lighter deep purple
+        ctx.fillStyle = 'rgba(50, 15, 70, 0.55)';
+        ctx.beginPath();
+        ctx.moveTo(mx, CANVAS_HEIGHT - GROUND_HEIGHT);
+        ctx.quadraticCurveTo(mx + 120, CANVAS_HEIGHT - GROUND_HEIGHT - 60, mx + 250, CANVAS_HEIGHT - GROUND_HEIGHT);
+        ctx.quadraticCurveTo(mx + 350, CANVAS_HEIGHT - GROUND_HEIGHT - 75, mx + 460, CANVAS_HEIGHT - GROUND_HEIGHT);
         ctx.closePath();
         ctx.fill();
       }
