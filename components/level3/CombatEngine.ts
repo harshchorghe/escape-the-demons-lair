@@ -38,9 +38,9 @@ export class CombatEngine {
   public playerStamina: number = 100;
   public playerMaxStamina: number = 100;
 
-  // Demons Defeated Counter (Goal: 50)
+  // Demons Defeated Counter (Goal: 75)
   public demonsDefeated: number = 0;
-  public totalDemons: number = 50;
+  public totalDemons: number = 75;
 
   public combo: number = 0;
   public comboTimer: NodeJS.Timeout | null = null;
@@ -179,7 +179,7 @@ export class CombatEngine {
     this.character.setState('slash');
     sound.playSlashSound();
 
-    this.checkHitOnDemon(25, false);
+    this.checkHitOnDemon(50, false);
     this.registerCombo();
   }
 
@@ -341,7 +341,7 @@ export class CombatEngine {
         }
 
         if (this.demonsDefeated >= this.totalDemons) {
-          this.showAnnouncement("🎉 VICTORY! ALL 50 DEMONS ELIMINATED!");
+          this.showAnnouncement("🎉 VICTORY! ALL 75 DEMONS ELIMINATED!");
           if (this.callbacks.onAllDemonsDefeated) {
             this.callbacks.onAllDemonsDefeated();
           }
@@ -368,10 +368,14 @@ export class CombatEngine {
   demonAttackPlayer() {
     if (this.playerHp <= 0) return;
 
+<<<<<<< HEAD
     const damage = 15;
     const targetPos = (this.currentTargetPlayer === 'p2' && this.partnerCharacter)
       ? this.partnerCharacter.group.position
       : this.character.group.position;
+=======
+    const damage = 50;
+>>>>>>> main
 
     if (this.currentTargetPlayer === 'p1') {
       if (this.isBlocking) {

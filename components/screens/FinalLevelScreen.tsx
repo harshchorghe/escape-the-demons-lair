@@ -33,7 +33,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     announcement: 'OWNDAYS TANJIRO FRAME ACTIVE!',
     isDemonDefeated: false,
     demonsDefeated: 0,
-    totalDemons: 50,
+    totalDemons: 75,
   });
 
   const [currentStyle, setCurrentStyle] = useState<'water' | 'flame' | 'thunder'>('water');
@@ -175,7 +175,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 
           gameSync.updateState({
             l3DemonHp: 0,
-            l3DemonsDefeated: 50,
+            l3DemonsDefeated: 75,
             l3TimeElapsed: l3TimeSpent,
             currentLevel: 4,
             gameStatus: 'victory',
@@ -492,26 +492,26 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
             </div>
           </div>
 
-          {/* Top Center: 50 Demons Elimination Tracker, Combo Counter & Live Announcement */}
+          {/* Top Center: 75 Demons Elimination Tracker, Combo Counter & Live Announcement */}
           <div className="flex flex-col items-center justify-center text-center space-y-2 mx-auto pointer-events-auto">
-            {/* 50 Demons Elimination Challenge Badge */}
+            {/* 75 Demons Elimination Challenge Badge */}
             <div className="bg-zinc-950/90 border border-red-800/80 px-5 py-2.5 rounded-2xl shadow-2xl space-y-1 max-w-xs">
               <div className="flex items-center justify-between text-[11px] font-mono font-extrabold gap-4">
                 <span className="text-red-400 flex items-center gap-1">
                   <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" /> DEMONS DEFEATED
                 </span>
                 <span className="text-amber-400 font-extrabold text-xs">
-                  {state.l3DemonsDefeated || stats.demonsDefeated || 0} / 50
+                  {state.l3DemonsDefeated || stats.demonsDefeated || 0} / 75
                 </span>
               </div>
               <div className="w-full h-3 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-red-600 via-amber-500 to-yellow-400 transition-all duration-500 shadow-[0_0_12px_rgba(239,68,68,0.7)]"
-                  style={{ width: `${Math.min(100, Math.round(((state.l3DemonsDefeated || stats.demonsDefeated || 0) / 50) * 100))}%` }}
+                  style={{ width: `${Math.min(100, Math.round(((state.l3DemonsDefeated || stats.demonsDefeated || 0) / 75) * 100))}%` }}
                 />
               </div>
               <p className="text-[9px] font-mono text-zinc-400 uppercase tracking-wider">
-                Defeat all 50 Demons fast to rank #1 on Leaderboard!
+                Defeat all 75 Demons fast to rank #1 on Leaderboard!
               </p>
             </div>
 
