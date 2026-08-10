@@ -350,16 +350,10 @@ export class CombatEngine {
     if (this.playerHp <= 0) return;
 
     const damage = 15;
-<<<<<<< HEAD
     const targetPos =
       targetDemon.currentTargetPlayer === 'p2' && this.partnerCharacter
         ? this.partnerCharacter.group.position
         : this.character.group.position;
-=======
-    const targetPos = (this.currentTargetPlayer === 'p2' && this.partnerCharacter)
-      ? this.partnerCharacter.group.position
-      : this.character.group.position;
->>>>>>> main
 
     if (targetDemon.currentTargetPlayer === 'p1') {
       this.playerHp = Math.max(0, this.playerHp - damage);
