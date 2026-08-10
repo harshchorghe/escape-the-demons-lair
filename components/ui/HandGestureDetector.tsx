@@ -197,7 +197,7 @@ export const HandGestureDetector: React.FC<HandGestureDetectorProps> = ({
 
       hands.setOptions({
         maxNumHands: 1,
-        modelComplexity: 1,
+        modelComplexity: 0, // Lightweight model for high-fps web performance
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
@@ -231,9 +231,13 @@ export const HandGestureDetector: React.FC<HandGestureDetectorProps> = ({
 
       handsInstanceRef.current = hands;
 
+      let lastFrameTime = 0;
       const camera = new (window as any).Camera(videoRef.current, {
         onFrame: async () => {
-          if (videoRef.current && handsInstanceRef.current) {
+          const now = Date.now();
+          // Process frame every 45ms (~22 FPS) to keep CPU & GPU fast
+          if (now - lastFrameTime > 45 && videoRef.current && handsInstanceRef.current) {
+            lastFrameTime = now;
             await handsInstanceRef.current.send({ image: videoRef.current });
           }
         },

@@ -9,7 +9,6 @@ import { HeaderHUD } from "@/components/ui/HeaderHUD";
 import { PythonConfigModal } from "@/components/ui/PythonConfigModal";
 import { VictoryScreen } from "@/components/screens/VictoryScreen";
 import { DisqualifiedScreen } from "@/components/screens/DisqualifiedScreen";
-import BackgroundVideo from "@/components/3d/BackgroundVideo";
 import { useRouter } from "next/navigation";
 import { Skull } from "lucide-react";
 
@@ -58,11 +57,8 @@ export default function Level2Page() {
 
   return (
     <div className="relative min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-purple-900 selection:text-white font-sans overflow-hidden">
-      {/* Background Video for Level 2 */}
-      <div className="fixed inset-0 z-0 opacity-70 pointer-events-none">
-        <BackgroundVideo src="/videos/level_2.mp4" />
-        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/40 via-zinc-950/20 to-zinc-950/50" />
-      </div>
+      {/* Ambient background styling for Level 2 */}
+      <div className="fixed inset-0 z-0 bg-gradient-to-b from-purple-950/20 via-zinc-950 to-black pointer-events-none" />
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <HeaderHUD

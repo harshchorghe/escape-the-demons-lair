@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
+import { getLevel2PhysicsConfig, DEFAULT_LEVEL2_PHYSICS, Level2PhysicsConfig } from "@/lib/physicsService";
 
 interface Level2ScreenProps {
   state: GameGameState;
@@ -113,16 +114,19 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   useEffect(() => { controlModeRef.current = controlMode; }, [controlMode]);
   useEffect(() => { isCameraEnabledRef.current = isCameraEnabled; }, [isCameraEnabled]);
 
-  // Constants (Easier & Forgiving Difficulty Settings)
+  // Remote Physics & Speed Configuration (Fetched from Firebase / Backend)
+  const physicsRef = useRef<Level2PhysicsConfig>(DEFAULT_LEVEL2_PHYSICS);
+
+  useEffect(() => {
+    getLevel2PhysicsConfig().then((config) => {
+      physicsRef.current = config;
+    });
+  }, []);
+
+  // Constants (Canvas bounds)
   const CANVAS_WIDTH = 400;
   const CANVAS_HEIGHT = 520;
   const GROUND_HEIGHT = 70;
-  const GRAVITY = 0.24; // Gentler gravity
-  const JUMP_STRENGTH = -5.2; // Smooth controllable lift
-  const MAX_FALL_SPEED = 7; // Slower max fall rate
-  const PIPE_SPEED = 1.5; // Relaxed scrolling speed
-  const PIPE_SPAWN_INTERVAL = 160; // Farther horizontal gap between pillar pairs
-  const PIPE_GAP = 200; // Extra wide vertical gap for easy passage
 
   // Handle high score load from local storage
   useEffect(() => {
@@ -264,6 +268,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
 
   const startHandDetection = () => {
     let lastTimestamp = 0;
+    let lastProcessedTime = 0;
 
     const detectFrame = () => {
       if (!handLandmarkerRef.current || !videoRef.current || !isCameraEnabledRef.current) return;
@@ -278,7 +283,15 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
         handDetectionLoopRef.current = requestAnimationFrame(detectFrame);
         return;
       }
+
+      // Throttle hand detection to ~20 FPS (every 45ms) to prevent main-thread lagging
+      if (now - lastProcessedTime < 45) {
+        handDetectionLoopRef.current = requestAnimationFrame(detectFrame);
+        return;
+      }
+
       lastTimestamp = now;
+      lastProcessedTime = now;
 
       const results = handLandmarkerRef.current.detectForVideo(videoRef.current, now);
       const currentTime = Date.now();
@@ -364,8 +377,8 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
       return;
     }
 
-    // Set upward velocity
-    birdRef.current.vy = JUMP_STRENGTH;
+    // Set upward velocity from backend physics config
+    birdRef.current.vy = physicsRef.current.jumpStrength;
     birdRef.current.flapTimer = 8; // Flapping wings effect frames
 
     // Spawn jump puff particles
@@ -472,10 +485,11 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
 
   // Pipe spawn utility
   const spawnPipe = () => {
+    const pipeGap = physicsRef.current.pipeGap || 200;
     const minHeight = 50;
-    const maxHeight = CANVAS_HEIGHT - GROUND_HEIGHT - PIPE_GAP - minHeight;
+    const maxHeight = Math.max(minHeight + 20, CANVAS_HEIGHT - GROUND_HEIGHT - pipeGap - minHeight);
     const topHeight = Math.floor(minHeight + Math.random() * (maxHeight - minHeight));
-    const bottomHeight = CANVAS_HEIGHT - GROUND_HEIGHT - topHeight - PIPE_GAP;
+    const bottomHeight = CANVAS_HEIGHT - GROUND_HEIGHT - topHeight - pipeGap;
 
     pipesRef.current.push({
       x: CANVAS_WIDTH,
@@ -575,20 +589,27 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
     if (!ctx) return;
 
     let frameCount = 0;
+    let lastTime = performance.now();
 
-    const loop = () => {
+    const loop = (nowTime: number = performance.now()) => {
       frameCount++;
+      // Delta time normalization factor (16.67ms = 60 FPS = 1.0)
+      const deltaMs = nowTime - lastTime;
+      lastTime = nowTime;
+      const dt = Math.min(Math.max(deltaMs / 16.67, 0.5), 2.5);
+
+      const phys = physicsRef.current;
       
       // Clear canvas
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
       // --- 1. Physics Updates (When Playing) ---
       if (isPlaying && !isGameOver && !isSuccess) {
-        // Bird physics
+        // Bird physics with delta time
         const bird = birdRef.current;
-        bird.vy += GRAVITY;
-        if (bird.vy > MAX_FALL_SPEED) bird.vy = MAX_FALL_SPEED;
-        bird.y += bird.vy;
+        bird.vy += phys.gravity * dt;
+        if (bird.vy > phys.maxFallSpeed) bird.vy = phys.maxFallSpeed;
+        bird.y += bird.vy * dt;
 
         // Angle rotation based on velocity
         bird.angle = Math.min(Math.PI / 4, Math.max(-Math.PI / 7, bird.vy * 0.08));
@@ -609,12 +630,13 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
 
         // Dynamic difficulty/speed boost after passing 15th pillar
         const isSpeedBoosted = scoreRef.current >= 15;
-        const currentPipeSpeed = isSpeedBoosted ? 6.5 : 4.5;
-        const currentSpawnInterval = isSpeedBoosted ? 58 : 85;
+        const baseSpeed = isSpeedBoosted ? phys.pipeSpeedBoost : phys.pipeSpeed;
+        const currentPipeSpeed = baseSpeed * dt;
+        const currentSpawnInterval = Math.max(30, Math.round(phys.pipeSpawnInterval * (isSpeedBoosted ? 0.68 : 1.0)));
 
         // Scroll Background & Parallax skyline
-        bgScrollXRef.current = (bgScrollXRef.current - 0.5) % CANVAS_WIDTH;
-        skylineScrollXRef.current = (skylineScrollXRef.current - 0.9) % CANVAS_WIDTH;
+        bgScrollXRef.current = (bgScrollXRef.current - 0.5 * dt) % CANVAS_WIDTH;
+        skylineScrollXRef.current = (skylineScrollXRef.current - 0.9 * dt) % CANVAS_WIDTH;
         groundScrollXRef.current = (groundScrollXRef.current - currentPipeSpeed) % CANVAS_WIDTH;
 
         // Spawn pipes

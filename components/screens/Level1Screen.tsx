@@ -5,7 +5,6 @@ import { GameGameState, gameSync } from "@/lib/gameStore";
 import { pythonApi, Level1RoomData, FALLBACK_L1_ROOMS } from "@/lib/pythonApi";
 import { puzzleService } from "@/lib/puzzleService";
 import { CheckCircle, Timer, AlertCircle, ArrowRight } from "lucide-react";
-import BackgroundVideo from "../3d/BackgroundVideo";
 import { GravityShiftPuzzle } from "../puzzles/GravityShiftPuzzle";
 
 interface Level1ScreenProps {
@@ -18,7 +17,7 @@ const ROOM_COLOR = "from-red-900/40 to-red-950/60 border-red-700/50 hover:border
 
 export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   const [rooms, setRooms] = useState<Level1RoomData[]>(FALLBACK_L1_ROOMS);
-  const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(1); // Auto-start room 1 directly
   const [roomTimer, setRoomTimer] = useState<number>(90);
   const [feedback, setFeedback] = useState<{ success?: boolean; message: string }>({ message: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -100,8 +99,9 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   // ── ROOM SELECTION HUB ──────────────────────────────────────────────
   if (activeRoomId === null) {
     return (
-      <div className="relative w-full min-h-screen overflow-hidden">
-        <BackgroundVideo src="/videos/level_1.mp4" />
+      <div className="relative w-full min-h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
+        {/* Ambient dark atmosphere background */}
+        <div className="fixed inset-0 z-0 bg-gradient-to-b from-red-950/20 via-zinc-950 to-black pointer-events-none" />
         <div className="relative z-10 max-w-2xl mx-auto px-4 py-8 space-y-8">
           {/* Header */}
           <div className="text-center space-y-2">
