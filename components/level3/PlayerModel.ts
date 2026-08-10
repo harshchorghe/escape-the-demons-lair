@@ -82,36 +82,39 @@ export class PlayerModel {
           }
         });
 
-        this.group.add(model);
-        this.scene.add(this.group);
-
         // ── 5. Animations: Case-insensitive mapping for Idle, Walk/Run, Attack, Death
         if (gltf.animations && gltf.animations.length > 0) {
           this.mixer = new THREE.AnimationMixer(model);
+
+          console.log(`[PlayerModel] Loaded clips for ${url}:`, gltf.animations.map(a => a.name));
 
           for (const clip of gltf.animations) {
             const name = clip.name.toLowerCase();
             this.clips.set(name, clip);
 
-            if (name.includes('idle') || name.includes('stand') || name.includes('breath')) {
+            if (name.includes('idle') || name.includes('stand') || name.includes('breath') || name.includes('stay') || name.includes('default')) {
               if (!this.semanticClips.has('idle')) this.semanticClips.set('idle', clip);
             }
-            if (name.includes('walk') || name.includes('run') || name.includes('move') || name.includes('chase')) {
+            if (name.includes('walk') || name.includes('run') || name.includes('move') || name.includes('chase') || name.includes('step') || name.includes('locomotion')) {
               if (!this.semanticClips.has('walk')) this.semanticClips.set('walk', clip);
               if (!this.semanticClips.has('walking')) this.semanticClips.set('walking', clip);
               if (!this.semanticClips.has('run')) this.semanticClips.set('run', clip);
             }
-            if (name.includes('attack') || name.includes('slash') || name.includes('hit') || name.includes('strike')) {
+            if (name.includes('attack') || name.includes('slash') || name.includes('hit') || name.includes('strike') || name.includes('swing') || name.includes('combo')) {
               if (!this.semanticClips.has('attack')) this.semanticClips.set('attack', clip);
             }
-            if (name.includes('death') || name.includes('die') || name.includes('dead') || name.includes('defeat') || name.includes('down')) {
+            if (name.includes('death') || name.includes('die') || name.includes('dead') || name.includes('defeat') || name.includes('down') || name.includes('fall')) {
               if (!this.semanticClips.has('death')) this.semanticClips.set('death', clip);
             }
           }
 
-          // Auto-play idle on spawn
+          // Pre-play idle animation & tick mixer frame 0 BEFORE adding model to scene to guarantee ZERO T-pose frames
           this.playAnimation('idle');
+          this.mixer.update(0);
         }
+
+        this.group.add(model);
+        this.scene.add(this.group);
 
         this.isReady = true;
         if (onReady) onReady();
@@ -212,15 +215,22 @@ export class PlayerModel {
     const action = this.mixer.clipAction(clip);
     action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
     action.clampWhenFinished = !loop;
+    action.timeScale = 1.35; // 1.35x speed multiplier for fast & responsive animations
     action.reset();
 
     if (this.currentAction && this.currentAction !== action) {
-      this.currentAction.fadeOut(0.15);
+      this.currentAction.fadeOut(0.12);
     }
 
-    action.fadeIn(0.15).play();
+    action.fadeIn(0.12).play();
     this.currentAction = action;
     this.currentClipName = key;
+  }
+
+  /** Get duration of player death animation clip if present, or fallback 1.5s */
+  public getDeathDuration(): number {
+    const clip = this.semanticClips.get('death') || this.clips.get('death');
+    return clip ? clip.duration : 1.5;
   }
 
   /** Must be called every frame with deltaTime (seconds). */

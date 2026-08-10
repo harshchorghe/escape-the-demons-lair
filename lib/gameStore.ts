@@ -38,8 +38,8 @@ export interface GameGameState {
   l3DemonStance: 'idle' | 'charging' | 'shielded' | 'vulnerable' | 'enraged';
   l3Player1Gesture: 'FIST' | 'PALM' | 'PEACE' | null;
   l3Player2Gesture: 'FIST' | 'PALM' | 'PEACE' | null;
-  p1Pos?: { x: number; z: number; rot: number; state: string };
-  p2Pos?: { x: number; z: number; rot: number; state: string };
+  p1Pos?: { x: number; z: number; rot: number; state: string; alive?: boolean; hp?: number };
+  p2Pos?: { x: number; z: number; rot: number; state: string; alive?: boolean; hp?: number };
   l3ComboCount: number;
   level1Duration: number;
   level2Duration: number;
@@ -78,8 +78,8 @@ export const INITIAL_GAME_STATE: GameGameState = {
   l3DemonStance: 'idle',
   l3Player1Gesture: null,
   l3Player2Gesture: null,
-  p1Pos: { x: -1.8, z: 0, rot: 0, state: 'idle' },
-  p2Pos: { x: 1.8, z: 0, rot: 0, state: 'idle' },
+  p1Pos: { x: -1.8, z: 0, rot: 0, state: 'idle', alive: true, hp: 100 },
+  p2Pos: { x: 1.8, z: 0, rot: 0, state: 'idle', alive: true, hp: 100 },
   l3ComboCount: 0,
   level1Duration: 60,
   level2Duration: 120,
@@ -283,6 +283,29 @@ class GameSyncManager {
       } catch (e) {
         console.warn("Firebase reset team state error:", e);
       }
+    }
+
+    this.notifyListeners();
+  }
+
+  /**
+   * Broadcast-only update: syncs via BroadcastChannel without writing to Firestore.
+   * Use this for high-frequency updates (position, rotation) to avoid Firestore write limits.
+   * Cross-device players get these via the throttled Firestore write in the game loop instead.
+   */
+  public broadcastLocal(partialUpdate: Partial<GameGameState>) {
+    const newState: GameGameState = {
+      ...this.currentState,
+      ...partialUpdate,
+      lastUpdated: Date.now(),
+    };
+
+    this.currentState = newState;
+    this.saveToSession(newState);
+
+    // BroadcastChannel only — no Firestore write
+    if (this.channel) {
+      this.channel.postMessage({ type: 'STATE_UPDATE', state: newState });
     }
 
     this.notifyListeners();

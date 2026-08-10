@@ -9,7 +9,7 @@ import { DemonSlayerCharacter } from "@/components/level3/DemonSlayerCharacter";
 import { EffectsEngine } from "@/components/level3/EffectsEngine";
 import { CombatEngine, CombatStats } from "@/components/level3/CombatEngine";
 import { sound } from "@/components/level3/SoundSynthesizer";
-import { Eye, Flame, ShieldAlert, Sparkles, Volume2, VolumeX, Camera, HelpCircle, Download, Zap, Heart, Swords, Crosshair } from "lucide-react";
+import { Flame, Volume2, VolumeX, HelpCircle } from "lucide-react";
 
 interface FinalLevelScreenProps {
   state: GameGameState;
@@ -21,27 +21,24 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
   const combatRef = useRef<CombatEngine | null>(null);
   const characterRef = useRef<DemonSlayerCharacter | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
 
   const [stats, setStats] = useState<CombatStats>({
     playerHp: 100,
     playerMaxHp: 100,
-    playerStamina: 100,
-    playerMaxStamina: 100,
-    demonHp: 150,
-    demonMaxHp: 150,
+    demonHp: 1,
+    demonMaxHp: 1,
     combo: 0,
-    announcement: 'OWNDAYS TANJIRO FRAME ACTIVE!',
+    announcement: '',
     isDemonDefeated: false,
     demonsDefeated: 0,
     totalDemons: 75,
   });
 
-  const [currentStyle, setCurrentStyle] = useState<'water' | 'flame' | 'thunder'>('water');
-  const [hasGlasses, setHasGlasses] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [announcementText, setAnnouncementText] = useState("OWNDAYS TANJIRO FRAME ACTIVE!");
-  const [showAnnouncement, setShowAnnouncement] = useState(true);
+  const [announcementText, setAnnouncementText] = useState('');
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
 
   const isL2Complete = state.currentLevel >= 3;
 
@@ -55,6 +52,12 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       }
     }
   }, [state]);
+
+  // ── Player HP values for dual display ──
+  const p1Hp = myRole === 'player1' ? stats.playerHp : (state.p1Pos?.hp ?? 100);
+  const p2Hp = myRole === 'player2' ? stats.playerHp : (state.p2Pos?.hp ?? 100);
+  const p1MaxHp = 100;
+  const p2MaxHp = 100;
 
   // Initialize 3D Engine
   useEffect(() => {
@@ -86,6 +89,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
+    rendererRef.current = renderer;
 
     // Append canvas
     container.appendChild(renderer.domElement);
@@ -102,29 +106,23 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     const { demonFire, floorGlow } = buildArena(scene);
     const embers = buildSkySphere(scene);
 
-    // Load tatami.glb as arena floor — replaces the primitive CylinderGeometry floor
+    // Load tatami.glb as arena floor
     let tatamiModel: THREE.Group | null = null;
     let isMounted = true;
     const gltfLoader = new GLTFLoader();
     gltfLoader.load('/models/tatami.glb', (gltf) => {
       if (!isMounted) return;
       const model = gltf.scene;
-      // Compute bounds for centering and scaling
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
-      // Center at world origin horizontally
       model.position.x = -center.x;
       model.position.z = -center.z;
-      // Scale so the longest horizontal axis fills ~32 units (matches old radius-16 arena)
       const scaleFactor = 32 / Math.max(size.x, size.z);
       model.scale.setScalar(scaleFactor);
-      // Force matrix update AFTER scale so the bounding box reflects actual world coords
       model.updateMatrixWorld(true);
       const scaledBox = new THREE.Box3().setFromObject(model);
-      // Lift so top surface sits at y = 0 (players stand on top)
       model.position.y = -scaledBox.max.y;
-      // Enable shadows on every mesh in the hierarchy
       model.traverse((child) => {
         if (child instanceof THREE.Mesh) {
           child.castShadow = true;
@@ -135,21 +133,43 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       scene.add(model);
     });
 
+    // 6. Character & Partner Character (GLB Models)
+    const p1ModelUrl = '/models/player1.glb';
+    const p2ModelUrl = '/models/player2.glb';
 
-    // 6. Character & Partner Character for Duo Arena (GLB Player Models)
-    const p1ModelUrl = myRole === 'player1' ? '/models/player1.glb' : '/models/player2.glb';
-    const p2ModelUrl = myRole === 'player1' ? '/models/player2.glb' : '/models/player1.glb';
+    const localModelUrl = myRole === 'player1' ? p1ModelUrl : p2ModelUrl;
+    const remoteModelUrl = myRole === 'player1' ? p2ModelUrl : p1ModelUrl;
 
-    const character = new DemonSlayerCharacter(scene, p1ModelUrl);
-    if (myRole === 'player2') {
-      character.setBreathingStyle('thunder');
-    }
+    const P1_SPAWN_X = -1.8;
+    const P2_SPAWN_X = 1.8;
+    const SPAWN_Z = 0;
+    const MIN_PLAYER_SEPARATION = 3.0;
+
+    const localSpawnX = myRole === 'player1' ? P1_SPAWN_X : P2_SPAWN_X;
+    const remoteSpawnX = myRole === 'player1' ? P2_SPAWN_X : P1_SPAWN_X;
+
+    const character = new DemonSlayerCharacter(scene, localModelUrl);
+    character.group.position.set(localSpawnX, 0, SPAWN_Z);
     characterRef.current = character;
 
-    // Partner Character in scene for co-op feel
-    const partnerCharacter = new DemonSlayerCharacter(scene, p2ModelUrl);
-    partnerCharacter.group.position.set(myRole === 'player1' ? 1.8 : -1.8, 0, 0);
-    partnerCharacter.setBreathingStyle(myRole === 'player1' ? 'thunder' : 'water');
+    const partnerCharacter = new DemonSlayerCharacter(scene, remoteModelUrl);
+    partnerCharacter.group.position.set(remoteSpawnX, 0, SPAWN_Z);
+
+    // Initial spawn: BroadcastChannel only — partner is loading at the same time,
+    // their first 3-second position sync will confirm state. No Firestore write needed here.
+    const initPosData = {
+      x: localSpawnX,
+      z: SPAWN_Z,
+      rot: 0,
+      state: 'idle',
+      alive: true,
+      hp: 100,
+    };
+    if (myRole === 'player1') {
+      gameSync.broadcastLocal({ p1Pos: initPosData });
+    } else {
+      gameSync.broadcastLocal({ p2Pos: initPosData });
+    }
 
     const effects = new EffectsEngine(scene, camera);
 
@@ -167,7 +187,14 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
           setTimeout(() => setShowAnnouncement(false), 2000);
         },
         onDemonDefeated: (count) => {
-          gameSync.updateState({ l3DemonsDefeated: count });
+          // Write to Firestore every 5 kills to batch updates.
+          // Victory at exactly 75 is handled by onAllDemonsDefeated which always writes immediately.
+          if (count % 5 === 0) {
+            gameSync.updateState({ l3DemonsDefeated: count });
+          } else {
+            // BroadcastChannel only — same-device tabs see the count instantly
+            gameSync.broadcastLocal({ l3DemonsDefeated: count });
+          }
         },
         onAllDemonsDefeated: () => {
           const level3DurationSec = state.level3Duration || 240;
@@ -198,7 +225,8 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
         }
       },
       state.l3DemonsDefeated || 0,
-      partnerCharacter
+      partnerCharacter,
+      myRole
     );
     combatRef.current = combat;
 
@@ -206,37 +234,27 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     const keys: Record<string, boolean> = {
       w: false, a: false, s: false, d: false,
       ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false,
-      Shift: false
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
 
-      if (e.key === 'j' || e.key === 'J') combat.playerLightSlash();
-      else if (e.key === 'k' || e.key === 'K') combat.playerSpecialAttack(character.breathingStyle);
-      else if (e.key === 'x' || e.key === 'X') combat.playerExecutionFinisher();
-      else if (e.key === ' ') combat.playerDash();
-      else if (e.key === 'Shift') combat.setPlayerBlocking(true);
-      else if (e.key === 'h' || e.key === 'H') combat.playerHeal();
-      else if (e.key === 'g' || e.key === 'G') {
-        const active = character.toggleGlasses();
-        setHasGlasses(active);
+      if (e.key === 'x' || e.key === 'X') {
+        combat.playerMeleeAttack();
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        combat.playerDash();
       }
-      else if (e.key === 'n' || e.key === 'N') combat.spawnDemonTarget();
-      else if (e.key === '1') switchStyle('water');
-      else if (e.key === '2') switchStyle('flame');
-      else if (e.key === '3') switchStyle('thunder');
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
-      if (e.key === 'Shift') combat.setPlayerBlocking(false);
     };
 
     const handleCanvasClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest('.hud-panel') || target.closest('button')) return;
-      combat.playerLightSlash();
+      combat.playerMeleeAttack();
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -300,38 +318,97 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
         );
       }
 
-      // Broadcast local player's 3D position over network/broadcast channel every 6 frames (~10Hz)
-      if (frameCounter % 6 === 0) {
+      // Broadcast local position via BroadcastChannel only (same-device tabs, instant, zero Firestore cost).
+      // Cross-device position is NOT synced — HP, death, demon count and victory are synced instead.
+      if (frameCounter % 3 === 0) {
         const charPos = character.group.position;
         const charRot = character.group.rotation.y;
+        const isLocalAlive = combat.playerHp > 0 && character.state !== 'die';
+        const localPosData = {
+          x: charPos.x,
+          z: charPos.z,
+          rot: charRot,
+          state: character.state,
+          alive: isLocalAlive,
+          hp: combat.playerHp
+        };
+
         if (myRole === 'player1') {
-          gameSync.updateState({ p1Pos: { x: charPos.x, z: charPos.z, rot: charRot, state: character.state } });
+          gameSync.broadcastLocal({ p1Pos: localPosData });
         } else {
-          gameSync.updateState({ p2Pos: { x: charPos.x, z: charPos.z, rot: charRot, state: character.state } });
+          gameSync.broadcastLocal({ p2Pos: localPosData });
         }
       }
 
-      // Smoothly update remote partner character's 3D position & movement in partner's screen
-      const partnerData = myRole === 'player1' ? stateRef.current.p2Pos : stateRef.current.p1Pos;
-      if (partnerData && partnerCharacter) {
-        const prevX = partnerCharacter.group.position.x;
-        const prevZ = partnerCharacter.group.position.z;
+      // Smoothly update remote partner position & animation
+      const partnerPosData = myRole === 'player1' ? stateRef.current.p2Pos : stateRef.current.p1Pos;
+      if (partnerPosData && partnerCharacter) {
+        const isPartnerAlive =
+          partnerPosData.alive !== false &&
+          partnerPosData.state !== 'die' &&
+          (partnerPosData.hp === undefined || partnerPosData.hp > 0);
 
-        partnerCharacter.group.position.x = THREE.MathUtils.lerp(partnerCharacter.group.position.x, partnerData.x, 0.2);
-        partnerCharacter.group.position.z = THREE.MathUtils.lerp(partnerCharacter.group.position.z, partnerData.z, 0.2);
-        partnerCharacter.group.rotation.y = THREE.MathUtils.lerp(partnerCharacter.group.rotation.y, partnerData.rot, 0.2);
+        if (!isPartnerAlive) {
+          partnerCharacter.setState('die');
+          partnerCharacter.update(deltaTime, false);
+          const deathDur = partnerCharacter.playerModel.getDeathDuration();
+          if (partnerCharacter.animTime >= deathDur + 0.5) {
+            partnerCharacter.group.visible = false;
+            if (partnerCharacter.group.parent) {
+              partnerCharacter.group.parent.remove(partnerCharacter.group);
+            }
+          }
+        } else {
+          partnerCharacter.group.visible = true;
+          const prevX = partnerCharacter.group.position.x;
+          const prevZ = partnerCharacter.group.position.z;
 
-        const distSq = (partnerCharacter.group.position.x - prevX) ** 2 + (partnerCharacter.group.position.z - prevZ) ** 2;
-        const isPartnerMoving = distSq > 0.0005;
+          // Safety check: prevent models from overlapping if synced positions are too close
+          let targetX = partnerPosData.x;
+          let targetZ = partnerPosData.z;
+          const distToLocal = Math.hypot(targetX - character.group.position.x, targetZ - character.group.position.z);
+          if (distToLocal < 1.2) {
+            const sideOffset = myRole === 'player1' ? 3.0 : -3.0;
+            targetX = character.group.position.x + sideOffset;
+          }
 
-        partnerCharacter.update(deltaTime, isPartnerMoving, new THREE.Vector3());
+          partnerCharacter.group.position.x = THREE.MathUtils.lerp(partnerCharacter.group.position.x, targetX, 0.2);
+          partnerCharacter.group.position.z = THREE.MathUtils.lerp(partnerCharacter.group.position.z, targetZ, 0.2);
+          partnerCharacter.group.rotation.y = THREE.MathUtils.lerp(partnerCharacter.group.rotation.y, partnerPosData.rot, 0.2);
+
+          const distSq = (partnerCharacter.group.position.x - prevX) ** 2 + (partnerCharacter.group.position.z - prevZ) ** 2;
+          const isPartnerMoving = distSq > 0.0005;
+
+          const remoteState = partnerPosData.state || 'idle';
+          if (remoteState === 'slash') {
+            partnerCharacter.setState('slash');
+          } else if (isPartnerMoving) {
+            partnerCharacter.setState('walk');
+          } else {
+            partnerCharacter.setState('idle');
+          }
+
+          partnerCharacter.update(deltaTime, isPartnerMoving);
+        }
       }
 
       character.update(deltaTime, isMoving, moveDir);
       effects.update(deltaTime);
       combat.update(deltaTime);
 
-      // Animate ember particles — drift upward, wrap at top
+      // Check Team Disqualification condition
+      const isLocalAlive = combat.playerHp > 0 && character.state !== 'die';
+      const isPartnerAlive = partnerPosData
+        ? (partnerPosData.alive !== false && partnerPosData.state !== 'die' && (partnerPosData.hp === undefined || partnerPosData.hp > 0))
+        : true;
+
+      if (!isLocalAlive && !isPartnerAlive) {
+        if (stateRef.current.gameStatus === 'playing' && stateRef.current.currentLevel === 3 && !stateRef.current.isDemonSealed) {
+          gameSync.updateState({ gameStatus: 'disqualified' });
+        }
+      }
+
+      // Animate embers & pulse lighting
       if (embers) {
         const ePos = embers.geometry.attributes.position.array as Float32Array;
         for (let ei = 0; ei < ePos.length; ei += 3) {
@@ -340,7 +417,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
         }
         embers.geometry.attributes.position.needsUpdate = true;
       }
-      // Pulse demon fire lights for a flickering flame effect
+
       demonFire.intensity = 4 + Math.sin(elapsedTime * 3.5) * 1.5;
       floorGlow.intensity = 3 + Math.sin(elapsedTime * 2.8 + 1.2) * 1.0;
 
@@ -353,7 +430,6 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 
     animate();
 
-    // Clean up
     return () => {
       isMounted = false;
       if (tatamiModel) scene.remove(tatamiModel);
@@ -366,6 +442,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       partnerCharacter.dispose();
       effects.dispose();
       renderer.dispose();
+      rendererRef.current = null;
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
@@ -373,47 +450,9 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isL2Complete]);
 
-  const switchStyle = (style: 'water' | 'flame' | 'thunder') => {
-    setCurrentStyle(style);
-    if (characterRef.current) {
-      characterRef.current.setBreathingStyle(style);
-    }
-    if (combatRef.current) {
-      if (style === 'water') combatRef.current.showAnnouncement("EQUIPPED OWNDAYS TANJIRO FRAME!");
-      else if (style === 'flame') combatRef.current.showAnnouncement("EQUIPPED OWNDAYS RENGOKU FRAME!");
-      else if (style === 'thunder') combatRef.current.showAnnouncement("EQUIPPED OWNDAYS ZENITSU FRAME!");
-    }
-  };
-
-  const handleToggleGlasses = () => {
-    if (characterRef.current) {
-      const active = characterRef.current.toggleGlasses();
-      setHasGlasses(active);
-      if (combatRef.current) {
-        combatRef.current.showAnnouncement(active ? "OWNDAYS GLASSES EQUIPPED!" : "GLASSES REMOVED");
-      }
-    }
-  };
-
   const handleToggleSound = () => {
     const muted = sound.toggleMute();
     setIsMuted(muted);
-  };
-
-  const handleResetCamera = () => {
-    if (characterRef.current && cameraRef.current) {
-      const charPos = characterRef.current.group.position;
-      cameraRef.current.position.set(charPos.x, charPos.y + 3.5, charPos.z + 7);
-    }
-  };
-
-  const handleExportBlender = () => {
-    if (characterRef.current) {
-      characterRef.current.exportBlenderOBJ();
-      if (combatRef.current) {
-        combatRef.current.showAnnouncement("EXPORTED BLENDER 3D MODEL (.OBJ)!");
-      }
-    }
   };
 
   if (!isL2Complete) {
@@ -443,81 +482,18 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 
       {/* HUD OVERLAY */}
       <div className="relative z-20 w-full h-full p-4 pointer-events-none flex flex-col justify-between">
-        
-        {/* TOP BAR: Player Stats & Target Info */}
-        <div className="flex flex-col md:flex-row items-start justify-between gap-4">
-          
-          {/* Top Left: Character Status Panel */}
-          <div className="hud-panel pointer-events-auto bg-zinc-950/80 backdrop-blur-md border border-zinc-800 p-3.5 rounded-2xl w-full max-w-xs space-y-3 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500/30 to-black border-2 border-cyan-400 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(0,210,255,0.4)]">
-                {currentStyle === 'water' ? '👓' : currentStyle === 'flame' ? '🔥' : '⚡'}
-              </div>
-              <div>
-                <h3 className="text-xs font-extrabold font-serif text-white tracking-wider flex items-center gap-1">
-                  OWNDAYS SLAYER <span className="text-[10px] text-amber-400 font-sans">鬼殺隊</span>
-                </h3>
-                <p className="text-[11px] text-cyan-400 font-mono font-semibold">
-                  {currentStyle === 'water' ? 'Tanjiro Frame • 水の呼吸' : currentStyle === 'flame' ? 'Kyojuro Frame • 炎の呼吸' : 'Zenitsu Frame • 雷の呼吸'}
-                </p>
-              </div>
-            </div>
 
-            {/* Health Bar */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] font-mono font-bold text-zinc-300">
-                <span>HEALTH (HP)</span>
-                <span>{stats.playerHp} / {stats.playerMaxHp}</span>
-              </div>
-              <div className="w-full h-3 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-300 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                  style={{ width: `${(stats.playerHp / stats.playerMaxHp) * 100}%` }}
-                />
-              </div>
-            </div>
+        {/* TOP BAR */}
+        <div className="flex items-start justify-between gap-4">
 
-            {/* Stamina Bar */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] font-mono font-bold text-zinc-300">
-                <span>BREATHING STAMINA</span>
-                <span>{stats.playerStamina} / {stats.playerMaxStamina}</span>
-              </div>
-              <div className="w-full h-2.5 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-400 transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-                  style={{ width: `${(stats.playerStamina / stats.playerMaxStamina) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
+          {/* Top Left: Spacer / Announcement alignment */}
+          <div className="w-48 hidden md:block" />
 
-          {/* Top Center: 75 Demons Elimination Tracker, Combo Counter & Live Announcement */}
+          {/* Top Center: Combo Counter & Live Announcement */}
           <div className="flex flex-col items-center justify-center text-center space-y-2 mx-auto pointer-events-auto">
-            {/* 75 Demons Elimination Challenge Badge */}
-            <div className="bg-zinc-950/90 border border-red-800/80 px-5 py-2.5 rounded-2xl shadow-2xl space-y-1 max-w-xs">
-              <div className="flex items-center justify-between text-[11px] font-mono font-extrabold gap-4">
-                <span className="text-red-400 flex items-center gap-1">
-                  <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" /> DEMONS DEFEATED
-                </span>
-                <span className="text-amber-400 font-extrabold text-xs">
-                  {state.l3DemonsDefeated || stats.demonsDefeated || 0} / 75
-                </span>
-              </div>
-              <div className="w-full h-3 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-red-600 via-amber-500 to-yellow-400 transition-all duration-500 shadow-[0_0_12px_rgba(239,68,68,0.7)]"
-                  style={{ width: `${Math.min(100, Math.round(((state.l3DemonsDefeated || stats.demonsDefeated || 0) / 75) * 100))}%` }}
-                />
-              </div>
-              <p className="text-[9px] font-mono text-zinc-400 uppercase tracking-wider">
-                Defeat all 75 Demons fast to rank #1 on Leaderboard!
-              </p>
-            </div>
-
             {stats.combo > 0 && (
-              <div className="animate-bounce">
-                <div className="text-5xl font-black font-serif text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.8)]">
+              <div className="animate-bounce" id="combo-container">
+                <div className="text-5xl font-black font-serif text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.8)]" id="combo-count">
                   {stats.combo}
                 </div>
                 <div className="text-[10px] font-mono font-extrabold tracking-widest text-white uppercase">
@@ -527,196 +503,95 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
             )}
 
             {showAnnouncement && (
-              <div className="bg-black/85 border border-amber-400 text-amber-300 font-serif font-extrabold text-sm sm:text-base px-6 py-2 rounded-full shadow-[0_0_25px_rgba(251,191,36,0.5)] transition-all animate-pulse">
+              <div className="bg-black/85 border border-amber-400 text-amber-300 font-serif font-extrabold text-sm sm:text-base px-6 py-2 rounded-full shadow-[0_0_25px_rgba(251,191,36,0.5)] transition-all animate-pulse" id="announcement">
                 {announcementText}
               </div>
             )}
           </div>
 
-          {/* Top Right: Style Selector & Demon Target HP */}
-          <div className="hud-panel pointer-events-auto bg-zinc-950/80 backdrop-blur-md border border-zinc-800 p-3.5 rounded-2xl w-full max-w-xs space-y-3 shadow-2xl">
-            <div className="text-[10px] font-mono font-extrabold text-amber-400 uppercase tracking-widest text-center border-b border-zinc-800 pb-1">
-              OWNDAYS KIMETSU COLLECTION
-            </div>
-
-            <div className="grid grid-cols-3 gap-1.5">
-              <button
-                onClick={() => switchStyle('water')}
-                className={`py-1.5 px-1 rounded-xl border text-[10px] font-mono font-bold transition-all flex flex-col items-center gap-0.5 ${
-                  currentStyle === 'water'
-                    ? 'bg-cyan-950/80 border-cyan-400 text-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                }`}
-              >
-                <span>🌊</span>
-                <span>Tanjiro</span>
-              </button>
-
-              <button
-                onClick={() => switchStyle('flame')}
-                className={`py-1.5 px-1 rounded-xl border text-[10px] font-mono font-bold transition-all flex flex-col items-center gap-0.5 ${
-                  currentStyle === 'flame'
-                    ? 'bg-orange-950/80 border-orange-500 text-orange-200 shadow-[0_0_12px_rgba(249,115,22,0.4)]'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                }`}
-              >
-                <span>🔥</span>
-                <span>Kyojuro</span>
-              </button>
-
-              <button
-                onClick={() => switchStyle('thunder')}
-                className={`py-1.5 px-1 rounded-xl border text-[10px] font-mono font-bold transition-all flex flex-col items-center gap-0.5 ${
-                  currentStyle === 'thunder'
-                    ? 'bg-yellow-950/80 border-yellow-400 text-yellow-200 shadow-[0_0_12px_rgba(250,204,21,0.4)]'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                }`}
-              >
-                <span>⚡</span>
-                <span>Zenitsu</span>
-              </button>
-            </div>
-
-            {/* Demon Target Health Card */}
-            <div className="bg-purple-950/40 border border-purple-800/50 p-2.5 rounded-xl space-y-1">
-              <div className="flex justify-between text-[10px] font-mono font-bold">
-                <span className="text-purple-400 flex items-center gap-1">
-                  <Flame className="w-3 h-3 text-purple-400" /> DEMON TARGET <span className="text-[9px]">鬼</span>
-                </span>
-                <span className="text-zinc-200">{stats.demonHp} / {stats.demonMaxHp}</span>
+          {/* Top Right: Player Health & Demons Defeated HUD Panel */}
+          <div className="hud-panel pointer-events-auto bg-zinc-950/85 backdrop-blur-md border border-zinc-800 p-3.5 rounded-2xl w-64 space-y-3 shadow-2xl">
+            {/* Player 1 Health */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-[11px] font-mono font-bold">
+                <span className="text-cyan-400 uppercase tracking-wider">{state.player1Name || 'PLAYER 1'}</span>
+                <span className="text-zinc-300">{Math.round(Math.max(0, p1Hp))} / {p1MaxHp}</span>
               </div>
-              <div className="w-full h-2.5 bg-zinc-950 border border-zinc-800 rounded-full overflow-hidden">
+              <div className="w-full h-2.5 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-purple-600 to-pink-500 transition-all duration-300 shadow-[0_0_10px_rgba(168,85,247,0.6)]"
-                  style={{ width: `${Math.max(0, (stats.demonHp / stats.demonMaxHp) * 100)}%` }}
+                  className="h-full bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-300 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                  style={{ width: `${Math.max(0, (p1Hp / p1MaxHp) * 100)}%` }}
                 />
               </div>
+            </div>
+
+            {/* Player 2 Health */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-[11px] font-mono font-bold">
+                <span className="text-amber-400 uppercase tracking-wider">{state.player2Name || 'PLAYER 2'}</span>
+                <span className="text-zinc-300">{Math.round(Math.max(0, p2Hp))} / {p2MaxHp}</span>
+              </div>
+              <div className="w-full h-2.5 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                  style={{ width: `${Math.max(0, (p2Hp / p2MaxHp) * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-zinc-800/80" />
+
+            {/* Demons Defeated Counter */}
+            <div className="flex items-center justify-between text-[11px] font-mono font-bold">
+              <span className="text-red-400 flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" /> DEMONS DEFEATED
+              </span>
+              <span className="text-amber-400 font-extrabold text-xs">
+                {state.l3DemonsDefeated || stats.demonsDefeated || 0} / 75
+              </span>
             </div>
           </div>
         </div>
 
-        {/* BOTTOM BAR: Quick Action Controls & Utilities */}
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          
-          {/* Action Grid */}
-          <div className="hud-panel pointer-events-auto bg-zinc-950/85 backdrop-blur-md border border-zinc-800 p-2.5 rounded-2xl flex flex-wrap items-center gap-2 max-w-2xl shadow-2xl">
-            <button
-              onClick={() => combatRef.current?.playerLightSlash()}
-              className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white text-xs font-mono font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-transform active:scale-95"
-            >
-              <span className="bg-black/60 border border-zinc-700 px-1.5 py-0.5 rounded text-[10px] text-amber-400">J</span>
-              <span>Light Slash</span>
-            </button>
+        {/* BOTTOM BAR */}
+        <div className="flex items-end justify-between">
 
-            <button
-              onClick={() => combatRef.current?.playerSpecialAttack(currentStyle)}
-              className="bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500 text-cyan-200 text-xs font-mono font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-[0_0_10px_rgba(6,182,212,0.3)] transition-transform active:scale-95"
-            >
-              <span className="bg-black/60 border border-cyan-700 px-1.5 py-0.5 rounded text-[10px] text-cyan-300">K</span>
-              <span>
-                {currentStyle === 'water' ? 'Water Form 1' : currentStyle === 'flame' ? 'Flame Form 1' : 'Thunder Form 1'}
-              </span>
-            </button>
-
-            <button
-              onClick={() => combatRef.current?.playerExecutionFinisher()}
-              className="bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white text-xs font-mono font-extrabold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse transition-transform active:scale-95"
-            >
-              <span className="bg-black/60 border border-red-700 px-1.5 py-0.5 rounded text-[10px] text-yellow-300">X</span>
-              <span>⚔️ Defeat Demon</span>
-            </button>
-
-            <button
-              onClick={() => combatRef.current?.playerDash()}
-              className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white text-xs font-mono font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-transform active:scale-95"
-            >
-              <span className="bg-black/60 border border-zinc-700 px-1.5 py-0.5 rounded text-[10px] text-amber-400">SPACE</span>
-              <span>Dash</span>
-            </button>
-
-            <button
-              onMouseDown={() => combatRef.current?.setPlayerBlocking(true)}
-              onMouseUp={() => combatRef.current?.setPlayerBlocking(false)}
-              onTouchStart={() => combatRef.current?.setPlayerBlocking(true)}
-              onTouchEnd={() => combatRef.current?.setPlayerBlocking(false)}
-              className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-white text-xs font-mono font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-transform active:scale-95"
-            >
-              <span className="bg-black/60 border border-zinc-700 px-1.5 py-0.5 rounded text-[10px] text-amber-400">SHIFT</span>
-              <span>Parry</span>
-            </button>
-
-            <button
-              onClick={() => combatRef.current?.playerHeal()}
-              className="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500 text-emerald-200 text-xs font-mono font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-transform active:scale-95"
-            >
-              <span className="bg-black/60 border border-emerald-700 px-1.5 py-0.5 rounded text-[10px] text-emerald-300">H</span>
-              <span>Heal</span>
-            </button>
-
-            <button
-              onClick={() => combatRef.current?.spawnDemonTarget()}
-              className="bg-purple-950/80 hover:bg-purple-900 border border-purple-500 text-purple-200 text-xs font-mono font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-transform active:scale-95"
-            >
-              <span className="bg-black/60 border border-purple-700 px-1.5 py-0.5 rounded text-[10px] text-purple-300">N</span>
-              <span>Spawn Demon</span>
-            </button>
-
-            <button
-              onClick={handleToggleGlasses}
-              className="bg-yellow-950/80 hover:bg-yellow-900 border border-yellow-500 text-yellow-200 text-xs font-mono font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-transform active:scale-95"
-            >
-              <span className="bg-black/60 border border-yellow-700 px-1.5 py-0.5 rounded text-[10px] text-yellow-300">G</span>
-              <span>{hasGlasses ? 'Glasses ON' : 'Glasses OFF'}</span>
-            </button>
-          </div>
-
-          {/* Utility Buttons */}
-          <div className="hud-panel pointer-events-auto bg-zinc-950/85 backdrop-blur-md border border-zinc-800 p-2.5 rounded-2xl flex items-center gap-2 shadow-2xl ml-auto">
-            <button
-              onClick={handleExportBlender}
-              title="Export 3D Model for Blender"
-              className="bg-gradient-to-r from-amber-600/40 to-orange-600/40 hover:from-amber-600 hover:to-orange-600 border border-amber-500 text-amber-200 text-xs font-mono font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export 3D</span>
-            </button>
-
+          {/* Bottom Left: Sound + Help Utility Group */}
+          <div className="hud-panel pointer-events-auto bg-zinc-950/85 backdrop-blur-md border border-zinc-800 p-2 rounded-2xl flex items-center gap-2 shadow-2xl">
             <button
               onClick={handleToggleSound}
-              className="p-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-300 transition-colors"
+              className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-300 transition-colors flex items-center gap-1.5 text-xs font-mono font-medium"
               title="Toggle Audio SFX"
             >
-              {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
-            </button>
-
-            <button
-              onClick={handleResetCamera}
-              className="p-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-300 transition-colors"
-              title="Reset Camera View"
-            >
-              <Camera className="w-4 h-4 text-cyan-400" />
+              {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5 text-emerald-400" />}
+              <span>Sound</span>
             </button>
 
             <button
               onClick={() => setIsHelpOpen(true)}
-              className="p-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-300 transition-colors"
-              title="Controls Help"
+              className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-300 transition-colors flex items-center gap-1.5 text-xs font-mono font-medium"
+              title="Controls Help Guide"
             >
-              <HelpCircle className="w-4 h-4 text-amber-400" />
+              <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+              <span>Help</span>
             </button>
           </div>
+
+          {/* Bottom Right: Spacer (Clean & empty) */}
+          <div />
 
         </div>
 
       </div>
 
-      {/* Controls Help Modal */}
+      {/* Controls Help Guide Modal */}
       {isHelpOpen && (
         <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-amber-500/50 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-zinc-900 border border-amber-500/50 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <h3 className="text-lg font-serif font-extrabold text-amber-400">
-                CONTROLS LEGEND <span className="text-xs text-zinc-400 font-sans">操作方法</span>
+                CONTROLS <span className="text-xs text-zinc-400 font-sans">操作方法</span>
               </h3>
               <button
                 onClick={() => setIsHelpOpen(false)}
@@ -729,51 +604,37 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
             <table className="w-full text-xs font-mono border-collapse">
               <tbody>
                 <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">W A S D</kbd> / <kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">Arrows</kbd></td>
-                  <td className="py-2 text-zinc-300">Move Character</td>
+                  <td className="py-2.5">
+                    <kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">X</kbd> / <span className="text-zinc-400">Click</span>
+                  </td>
+                  <td className="py-2.5 text-zinc-300 font-semibold">Attack</td>
                 </tr>
                 <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">J</kbd> / <span className="text-zinc-400">Click</span></td>
-                  <td className="py-2 text-zinc-300">Light Katana Slash</td>
+                  <td className="py-2.5">
+                    <kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">SPACE</kbd>
+                  </td>
+                  <td className="py-2.5 text-zinc-300 font-semibold">Dash</td>
                 </tr>
                 <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">K</kbd></td>
-                  <td className="py-2 text-zinc-300">Special Breathing Technique</td>
-                </tr>
-                <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">X</kbd></td>
-                  <td className="py-2 text-zinc-300">⚔️ Defeat Demon Instant Finisher</td>
-                </tr>
-                <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">SPACE</kbd></td>
-                  <td className="py-2 text-zinc-300">Dodge / Dash</td>
-                </tr>
-                <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">SHIFT</kbd></td>
-                  <td className="py-2 text-zinc-300">Parry / Guard (-75% damage)</td>
-                </tr>
-                <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">H</kbd></td>
-                  <td className="py-2 text-zinc-300">Gourd Heal</td>
-                </tr>
-                <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">G</kbd></td>
-                  <td className="py-2 text-zinc-300">Toggle OWNDAYS Kimetsu Glasses</td>
-                </tr>
-                <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">N</kbd></td>
-                  <td className="py-2 text-zinc-300">Spawn / Respawn Demon Target</td>
-                </tr>
-                <tr className="border-b border-zinc-800/60">
-                  <td className="py-2"><kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">1 2 3</kbd></td>
-                  <td className="py-2 text-zinc-300">Switch OWNDAYS Glasses & Form</td>
+                  <td className="py-2.5">
+                    <kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">W A S D</kbd> / <kbd className="bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-amber-300">Arrows</kbd>
+                  </td>
+                  <td className="py-2.5 text-zinc-300 font-semibold">Movement</td>
                 </tr>
                 <tr>
-                  <td className="py-2"><span className="text-zinc-400">Mouse Drag</span></td>
-                  <td className="py-2 text-zinc-300">360° Orbit Camera</td>
+                  <td className="py-2.5">
+                    <span className="text-zinc-400">Mouse Drag</span>
+                  </td>
+                  <td className="py-2.5 text-zinc-300 font-semibold">360° Orbit Camera</td>
                 </tr>
               </tbody>
             </table>
+
+            <div className="bg-red-950/40 border border-red-800/50 rounded-xl p-3 text-[10px] font-mono text-red-300 space-y-1">
+              <p className="font-bold text-red-400 uppercase tracking-wider">COMBAT RULES</p>
+              <p>• Approach a demon and strike with X or Click to defeat it</p>
+              <p>• Eliminate all 75 demons with your partner to win!</p>
+            </div>
 
             <button
               onClick={() => setIsHelpOpen(false)}
@@ -790,11 +651,11 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 
 // ── Arena Builder Helpers
 function buildArena(scene: THREE.Scene): { demonFire: THREE.PointLight; floorGlow: THREE.PointLight } {
-  // 1. Soft Warm Ambient Light (preserves dark red background while illuminating models clearly)
+  // 1. Soft Warm Ambient Light
   const ambient = new THREE.AmbientLight(0xffe2d0, 1.4);
   scene.add(ambient);
 
-  // 2. Key Directional Light (from front/top, warm golden-orange, casts crisp soft shadows)
+  // 2. Key Directional Light
   const fireKey = new THREE.DirectionalLight(0xffd5a6, 2.6);
   fireKey.position.set(6, 16, 10);
   fireKey.castShadow = true;
@@ -803,12 +664,12 @@ function buildArena(scene: THREE.Scene): { demonFire: THREE.PointLight; floorGlo
   fireKey.shadow.bias = -0.0002;
   scene.add(fireKey);
 
-  // 3. Hemisphere Fill Light (warm sky glow / deep orange ground fill for clear visibility without flat shading)
+  // 3. Hemisphere Fill Light
   const fillHemi = new THREE.HemisphereLight(0xffbe88, 0x661800, 1.4);
   fillHemi.position.set(0, 18, 0);
   scene.add(fillHemi);
 
-  // 4. Rim Light (from behind for silhouette depth and separation from background)
+  // 4. Rim Light
   const rimLight = new THREE.DirectionalLight(0xff5500, 1.8);
   rimLight.position.set(0, 6, -12);
   scene.add(rimLight);
@@ -818,12 +679,12 @@ function buildArena(scene: THREE.Scene): { demonFire: THREE.PointLight; floorGlo
   demonFire.position.set(0, 4, -9);
   scene.add(demonFire);
 
-  // Ground-level orange glow simulating floor fire
+  // Ground-level orange glow
   const floorGlow = new THREE.PointLight(0xff7700, 3.5, 20);
   floorGlow.position.set(0, 0.8, 3);
   scene.add(floorGlow);
 
-  // Warm character & enemy overhead spotlight
+  // Character overhead spotlight
   const charSpot = new THREE.SpotLight(0xffe8d0, 2.5, 18, Math.PI * 0.22, 0.5, 1.0);
   charSpot.position.set(0, 10, 3);
   charSpot.target.position.set(0, 0.8, 0);
@@ -842,7 +703,6 @@ function buildArena(scene: THREE.Scene): { demonFire: THREE.PointLight; floorGlo
 }
 
 function buildSkySphere(scene: THREE.Scene): THREE.Points {
-  // Dark crimson sky — no blue, no stars, burning throne room atmosphere
   const skyGeo = new THREE.SphereGeometry(80, 32, 32);
   const skyMat = new THREE.MeshBasicMaterial({
     color: 0x150000,
@@ -851,20 +711,19 @@ function buildSkySphere(scene: THREE.Scene): THREE.Points {
   const sky = new THREE.Mesh(skyGeo, skyMat);
   scene.add(sky);
 
-  // Ember particle system — 200 floating orange/red particles drifting upward
   const emberCount = 200;
   const emberGeo = new THREE.BufferGeometry();
   const emberPos = new Float32Array(emberCount * 3);
   const emberCol = new Float32Array(emberCount * 3);
 
   for (let i = 0; i < emberCount; i++) {
-    emberPos[i * 3]     = (Math.random() - 0.5) * 30; // x
-    emberPos[i * 3 + 1] = Math.random() * 22 - 3;      // y: -3 to 19
-    emberPos[i * 3 + 2] = (Math.random() - 0.5) * 30; // z
+    emberPos[i * 3]     = (Math.random() - 0.5) * 30;
+    emberPos[i * 3 + 1] = Math.random() * 22 - 3;
+    emberPos[i * 3 + 2] = (Math.random() - 0.5) * 30;
     const t = Math.random();
-    emberCol[i * 3]     = 1.0;              // R always full
-    emberCol[i * 3 + 1] = 0.15 + t * 0.45; // G: 0.15–0.60 (orange → yellow)
-    emberCol[i * 3 + 2] = 0.0;             // B none
+    emberCol[i * 3]     = 1.0;
+    emberCol[i * 3 + 1] = 0.15 + t * 0.45;
+    emberCol[i * 3 + 2] = 0.0;
   }
 
   emberGeo.setAttribute('position', new THREE.BufferAttribute(emberPos, 3));
