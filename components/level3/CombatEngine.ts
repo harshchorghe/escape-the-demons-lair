@@ -237,7 +237,7 @@ export class CombatEngine {
    * Normal melee attack — deterministic distance & angle check with single hit registration.
    */
   playerMeleeAttack() {
-    if (this.playerHp <= 0) return;
+    if (this.playerHp <= 0 || this.character.state === 'die') return;
 
     // Reset single-hit registration flag for this attack press
     this.attackHitRegistered = false;
@@ -262,7 +262,7 @@ export class CombatEngine {
    * Dash — forward movement using cooldown timing (no stamina dependency).
    */
   playerDash() {
-    if (this.playerHp <= 0) return;
+    if (this.playerHp <= 0 || this.character.state === 'die') return;
     if (this.dashCooldownRemaining > 0) return;
 
     sound.playDashSound();
@@ -276,6 +276,7 @@ export class CombatEngine {
    * Guarantees 1 attack press = at most 1 damage event via attackHitRegistered flag.
    */
   checkHitOnDemon(targetDemon?: DemonTarget | null) {
+    if (this.playerHp <= 0 || this.character.state === 'die') return;
     if (this.attackHitRegistered) return; // Prevent double hits from single attack press
 
     const charPos = this.character.group.position;
@@ -347,15 +348,18 @@ export class CombatEngine {
   }
 
   demonAttackPlayer(targetDemon: DemonTarget) {
-    if (this.playerHp <= 0) return;
+    if (this.playerHp <= 0 || this.character.state === 'die') return;
 
     const damage = 15;
-    const targetPos =
-      targetDemon.currentTargetPlayer === 'p2' && this.partnerCharacter
-        ? this.partnerCharacter.group.position
-        : this.character.group.position;
+    const isTargetingMe =
+      (this.myRole === 'player1' && targetDemon.currentTargetPlayer === 'p1') ||
+      (this.myRole === 'player2' && targetDemon.currentTargetPlayer === 'p2');
 
-    if (targetDemon.currentTargetPlayer === 'p1') {
+    const targetPos = isTargetingMe
+      ? this.character.group.position
+      : (this.partnerCharacter ? this.partnerCharacter.group.position : this.character.group.position);
+
+    if (isTargetingMe) {
       this.playerHp = Math.max(0, this.playerHp - damage);
       sound.playImpactSound();
       this.character.setState('hurt');
@@ -384,7 +388,6 @@ export class CombatEngine {
         }
       } else {
         // Immediate HP-only Firestore write so partner's HP bar updates in real-time.
-        // This fires at most ~7 times per player per game (100hp / 15 damage) — negligible cost.
         const hpData = {
           x: this.character.group.position.x,
           z: this.character.group.position.z,
@@ -400,7 +403,7 @@ export class CombatEngine {
         }
       }
     } else {
-      // Attacking partner (Player 2)
+      // Attacking partner
       sound.playImpactSound();
       this.effects.spawnDamageNumber(damage, targetPos, true);
     }

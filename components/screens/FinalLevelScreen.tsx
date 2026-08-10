@@ -11,6 +11,8 @@ import { CombatEngine, CombatStats } from "@/components/level3/CombatEngine";
 import { sound } from "@/components/level3/SoundSynthesizer";
 import { Flame, Volume2, VolumeX, HelpCircle } from "lucide-react";
 
+import { modelCache } from "@/lib/modelCache";
+
 interface FinalLevelScreenProps {
   state: GameGameState;
   myRole: 'player1' | 'player2';
@@ -22,6 +24,16 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
   const characterRef = useRef<DemonSlayerCharacter | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+
+  // Preload all Level 3 3D models in background as soon as component is mounted
+  useEffect(() => {
+    modelCache.preload([
+      '/models/tatami.glb',
+      '/models/player1.glb',
+      '/models/player2.glb',
+      '/models/demon.glb',
+    ]);
+  }, []);
 
   const [stats, setStats] = useState<CombatStats>({
     playerHp: 100,
@@ -106,13 +118,14 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     const { demonFire, floorGlow } = buildArena(scene);
     const embers = buildSkySphere(scene);
 
-    // Load tatami.glb as arena floor
+    // Load tatami.glb as arena floor via modelCache
     let tatamiModel: THREE.Group | null = null;
     let isMounted = true;
-    const gltfLoader = new GLTFLoader();
-    gltfLoader.load('/models/tatami.glb', (gltf) => {
+    modelCache.loadGLTF('/models/tatami.glb').then((gltfData) => {
       if (!isMounted) return;
-      const model = gltf.scene;
+      const cloned = modelCache.getCloned('/models/tatami.glb');
+      const model = cloned ? cloned.scene : gltfData.scene.clone(true);
+
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
@@ -237,6 +250,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (combatRef.current && (combatRef.current.playerHp <= 0 || character.state === 'die')) return;
       if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
 
       if (e.key === 'x' || e.key === 'X') {
@@ -252,6 +266,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     };
 
     const handleCanvasClick = (e: MouseEvent) => {
+      if (combatRef.current && (combatRef.current.playerHp <= 0 || character.state === 'die')) return;
       const target = e.target as HTMLElement;
       if (target.closest('.hud-panel') || target.closest('button')) return;
       combat.playerMeleeAttack();
@@ -272,6 +287,13 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     };
     window.addEventListener('resize', handleResize);
 
+    // Pre-compile WebGL shaders to prevent initial render frame drops
+    try {
+      renderer.compile(scene, camera);
+    } catch (e) {
+      // ignore
+    }
+
     // 9. Main Animation Loop
     const clock = new THREE.Clock();
     let animFrameId: number;
@@ -285,15 +307,19 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       const deltaTime = Math.min(clock.getDelta(), 0.1);
       elapsedTime += deltaTime;
 
+      const isLocalAlive = combat.playerHp > 0 && character.state !== 'die';
+
       const moveDir = new THREE.Vector3();
-      if (keys.w || keys.ArrowUp) moveDir.z -= 1;
-      if (keys.s || keys.ArrowDown) moveDir.z += 1;
-      if (keys.a || keys.ArrowLeft) moveDir.x -= 1;
-      if (keys.d || keys.ArrowRight) moveDir.x += 1;
+      if (isLocalAlive) {
+        if (keys.w || keys.ArrowUp) moveDir.z -= 1;
+        if (keys.s || keys.ArrowDown) moveDir.z += 1;
+        if (keys.a || keys.ArrowLeft) moveDir.x -= 1;
+        if (keys.d || keys.ArrowRight) moveDir.x += 1;
+      }
 
-      const isMoving = moveDir.lengthSq() > 0;
+      const isMoving = isLocalAlive && moveDir.lengthSq() > 0;
 
-      if (isMoving && combat.playerHp > 0) {
+      if (isMoving) {
         moveDir.normalize();
 
         const cameraAngle = Math.atan2(
@@ -318,19 +344,17 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
         );
       }
 
-      // Broadcast local position via BroadcastChannel only (same-device tabs, instant, zero Firestore cost).
-      // Cross-device position is NOT synced — HP, death, demon count and victory are synced instead.
+      // Broadcast local position via BroadcastChannel
       if (frameCounter % 3 === 0) {
         const charPos = character.group.position;
         const charRot = character.group.rotation.y;
-        const isLocalAlive = combat.playerHp > 0 && character.state !== 'die';
         const localPosData = {
           x: charPos.x,
           z: charPos.z,
           rot: charRot,
-          state: character.state,
+          state: isLocalAlive ? character.state : 'die',
           alive: isLocalAlive,
-          hp: combat.playerHp
+          hp: Math.max(0, combat.playerHp),
         };
 
         if (myRole === 'player1') {
@@ -343,10 +367,11 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       // Smoothly update remote partner position & animation
       const partnerPosData = myRole === 'player1' ? stateRef.current.p2Pos : stateRef.current.p1Pos;
       if (partnerPosData && partnerCharacter) {
-        const isPartnerAlive =
+        const isPartnerAlive = Boolean(
           partnerPosData.alive !== false &&
           partnerPosData.state !== 'die' &&
-          (partnerPosData.hp === undefined || partnerPosData.hp > 0);
+          (typeof partnerPosData.hp === 'number' ? partnerPosData.hp > 0 : true)
+        );
 
         if (!isPartnerAlive) {
           partnerCharacter.setState('die');
@@ -354,12 +379,13 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
           const deathDur = partnerCharacter.playerModel.getDeathDuration();
           if (partnerCharacter.animTime >= deathDur + 0.5) {
             partnerCharacter.group.visible = false;
-            if (partnerCharacter.group.parent) {
-              partnerCharacter.group.parent.remove(partnerCharacter.group);
-            }
           }
         } else {
+          if (!scene.children.includes(partnerCharacter.group)) {
+            scene.add(partnerCharacter.group);
+          }
           partnerCharacter.group.visible = true;
+
           const prevX = partnerCharacter.group.position.x;
           const prevZ = partnerCharacter.group.position.z;
 
@@ -397,12 +423,11 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       combat.update(deltaTime);
 
       // Check Team Disqualification condition
-      const isLocalAlive = combat.playerHp > 0 && character.state !== 'die';
-      const isPartnerAlive = partnerPosData
-        ? (partnerPosData.alive !== false && partnerPosData.state !== 'die' && (partnerPosData.hp === undefined || partnerPosData.hp > 0))
+      const isPartnerAliveChecked = partnerPosData
+        ? (partnerPosData.alive !== false && partnerPosData.state !== 'die' && (typeof partnerPosData.hp === 'number' ? partnerPosData.hp > 0 : true))
         : true;
 
-      if (!isLocalAlive && !isPartnerAlive) {
+      if (!isLocalAlive && !isPartnerAliveChecked) {
         if (stateRef.current.gameStatus === 'playing' && stateRef.current.currentLevel === 3 && !stateRef.current.isDemonSealed) {
           gameSync.updateState({ gameStatus: 'disqualified' });
         }

@@ -51,8 +51,12 @@ export class DemonSlayerCharacter {
     };
   }
 
-  setState(newState: string) {
-    if (this.state !== newState) {
+  setState(newState: string, forceReset: boolean = false) {
+    if (this.state === 'die' && newState !== 'die' && !forceReset) {
+      // Once dead, state is locked to 'die' until an explicit game reset occurs
+      return;
+    }
+    if (this.state !== newState || forceReset) {
       this.state = newState;
       this.animTime = 0;
     }
@@ -60,6 +64,7 @@ export class DemonSlayerCharacter {
 
   /** Smoothly rotate character toward a 3D target position (used when attacking) */
   faceTarget(targetPos: THREE.Vector3) {
+    if (this.state === 'die') return; // Cannot rotate when dead
     const charPos = this.group.position;
     const dx = targetPos.x - charPos.x;
     const dz = targetPos.z - charPos.z;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { modelCache } from '@/lib/modelCache';
 
 /**
  * PlayerModel
@@ -24,110 +24,83 @@ export class PlayerModel {
   }
 
   /**
-   * Load GLB model, configure scale (~2.6 height), ground feet on tatami (y = 0),
+   * Load GLB model from cache or fetch asynchronously, configure scale (~2.6 height), ground feet on tatami (y = 0),
    * enable cast/receive shadows, and parse animation clips.
    */
   load(url: string, onReady?: () => void) {
     this.isDisposed = false;
-    const loader = new GLTFLoader();
 
-    loader.load(
-      url,
-      (gltf) => {
-        if (this.isDisposed) {
-          gltf.scene.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-              if (child.geometry) child.geometry.dispose();
-              if (child.material) {
-                if (Array.isArray(child.material)) {
-                  child.material.forEach((m) => {
-                    if (m.map) m.map.dispose();
-                    m.dispose();
-                  });
-                } else {
-                  if (child.material.map) child.material.map.dispose();
-                  child.material.dispose();
-                }
-              }
-            }
-          });
-          return;
+    modelCache.loadGLTF(url).then((gltfData) => {
+      if (this.isDisposed) return;
+
+      const cloned = modelCache.getCloned(url);
+      const model = cloned ? cloned.scene : gltfData.scene.clone(true);
+      const animations = gltfData.animations;
+
+      // ── 1. Scale: Standard Player Height (~2.6 world units)
+      const boxBefore = new THREE.Box3().setFromObject(model);
+      const sizeBefore = boxBefore.getSize(new THREE.Vector3());
+      const targetHeight = 2.6;
+      const scale = targetHeight / Math.max(sizeBefore.y, 0.001);
+      model.scale.setScalar(scale);
+
+      // ── 2. Position: Recalculate bounding box AFTER scale is applied,
+      //    then lift so the bottom of the model sits exactly at y = 0 (top of tatami).
+      model.updateMatrixWorld(true);
+      const boxAfter = new THREE.Box3().setFromObject(model);
+      model.position.y = -boxAfter.min.y;
+
+      // ── 3. Rotation: Aligned with group forward direction
+      model.rotation.y = 0;
+
+      // ── 4. Shadows: Enable castShadow & receiveShadow on ALL meshes
+      model.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
         }
+      });
 
-        const model = gltf.scene;
+      // ── 5. Animations: Case-insensitive mapping for Idle, Walk/Run, Attack, Death
+      if (animations && animations.length > 0) {
+        this.mixer = new THREE.AnimationMixer(model);
 
-        // ── 1. Scale: Standard Player Height (~2.6 world units)
-        //    Measure BEFORE scaling to get original height
-        const boxBefore = new THREE.Box3().setFromObject(model);
-        const sizeBefore = boxBefore.getSize(new THREE.Vector3());
-        const targetHeight = 2.6;
-        const scale = targetHeight / Math.max(sizeBefore.y, 0.001);
-        model.scale.setScalar(scale);
+        for (const clip of animations) {
+          const name = clip.name.toLowerCase();
+          this.clips.set(name, clip);
 
-        // ── 2. Position: Recalculate bounding box AFTER scale is applied,
-        //    then lift so the bottom of the model sits exactly at y = 0 (top of tatami).
-        model.updateMatrixWorld(true);
-        const boxAfter = new THREE.Box3().setFromObject(model);
-        // Place model so its feet are at y=0
-        model.position.y = -boxAfter.min.y;
-
-        // ── 3. Rotation: Aligned with group forward direction
-        model.rotation.y = 0;
-
-        // ── 4. Shadows: Enable castShadow & receiveShadow on ALL meshes
-        model.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
+          if (name.includes('idle') || name.includes('stand') || name.includes('breath') || name.includes('stay') || name.includes('default')) {
+            if (!this.semanticClips.has('idle')) this.semanticClips.set('idle', clip);
           }
-        });
-
-        // ── 5. Animations: Case-insensitive mapping for Idle, Walk/Run, Attack, Death
-        if (gltf.animations && gltf.animations.length > 0) {
-          this.mixer = new THREE.AnimationMixer(model);
-
-          console.log(`[PlayerModel] Loaded clips for ${url}:`, gltf.animations.map(a => a.name));
-
-          for (const clip of gltf.animations) {
-            const name = clip.name.toLowerCase();
-            this.clips.set(name, clip);
-
-            if (name.includes('idle') || name.includes('stand') || name.includes('breath') || name.includes('stay') || name.includes('default')) {
-              if (!this.semanticClips.has('idle')) this.semanticClips.set('idle', clip);
-            }
-            if (name.includes('walk') || name.includes('run') || name.includes('move') || name.includes('chase') || name.includes('step') || name.includes('locomotion')) {
-              if (!this.semanticClips.has('walk')) this.semanticClips.set('walk', clip);
-              if (!this.semanticClips.has('walking')) this.semanticClips.set('walking', clip);
-              if (!this.semanticClips.has('run')) this.semanticClips.set('run', clip);
-            }
-            if (name.includes('attack') || name.includes('slash') || name.includes('hit') || name.includes('strike') || name.includes('swing') || name.includes('combo')) {
-              if (!this.semanticClips.has('attack')) this.semanticClips.set('attack', clip);
-            }
-            if (name.includes('death') || name.includes('die') || name.includes('dead') || name.includes('defeat') || name.includes('down') || name.includes('fall')) {
-              if (!this.semanticClips.has('death')) this.semanticClips.set('death', clip);
-            }
+          if (name.includes('walk') || name.includes('run') || name.includes('move') || name.includes('chase') || name.includes('step') || name.includes('locomotion')) {
+            if (!this.semanticClips.has('walk')) this.semanticClips.set('walk', clip);
+            if (!this.semanticClips.has('walking')) this.semanticClips.set('walking', clip);
+            if (!this.semanticClips.has('run')) this.semanticClips.set('run', clip);
           }
-
-          // Pre-play idle animation & tick mixer frame 0 BEFORE adding model to scene to guarantee ZERO T-pose frames
-          this.playAnimation('idle');
-          this.mixer.update(0);
+          if (name.includes('attack') || name.includes('slash') || name.includes('hit') || name.includes('strike') || name.includes('swing') || name.includes('combo')) {
+            if (!this.semanticClips.has('attack')) this.semanticClips.set('attack', clip);
+          }
+          if (name.includes('death') || name.includes('die') || name.includes('dead') || name.includes('defeat') || name.includes('down') || name.includes('fall')) {
+            if (!this.semanticClips.has('death')) this.semanticClips.set('death', clip);
+          }
         }
 
-        this.group.add(model);
-        this.scene.add(this.group);
-
-        this.isReady = true;
-        if (onReady) onReady();
-      },
-      undefined,
-      (err) => {
-        console.error(`[PlayerModel] Failed to load ${url}:`, err);
-        // ── Fallback: render a colored capsule so the partner is always visible ──
-        if (!this.isDisposed) {
-          this.spawnFallbackMesh(url);
-        }
+        // Pre-play idle animation & tick mixer frame 0 BEFORE adding model to scene to guarantee ZERO T-pose frames
+        this.playAnimation('idle');
+        this.mixer.update(0);
       }
-    );
+
+      this.group.add(model);
+      this.scene.add(this.group);
+
+      this.isReady = true;
+      if (onReady) onReady();
+    }).catch((err) => {
+      console.error(`[PlayerModel] Failed to load ${url}:`, err);
+      if (!this.isDisposed) {
+        this.spawnFallbackMesh(url);
+      }
+    });
   }
 
   /**
