@@ -1,18 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { GameGameState, gameSync } from "@/lib/gameStore";
-import { saveTeamScore, getAllTeamsLeaderboard, LeaderboardEntry } from "@/lib/leaderboardService";
+import { saveTeamScore } from "@/lib/leaderboardService";
 import confetti from "canvas-confetti";
-import { Trophy, Clock, ShieldCheck, RotateCcw, Award } from "lucide-react";
+import { Trophy, ShieldCheck, RotateCcw, Award } from "lucide-react";
 
 interface VictoryScreenProps {
   state: GameGameState;
 }
 
 export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-
   useEffect(() => {
     // Trigger victory confetti burst!
     try {
@@ -26,7 +24,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
       // Confetti fallback
     }
 
-    const recordScoreAndFetch = async () => {
+    const recordScore = async () => {
       const finalTotalTime = state.totalTimeElapsed || 0;
 
       // Save score to Firestore & Local storage with 3 levels completed!
@@ -35,19 +33,17 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
         teamName: state.teamName || 'Demon Slayers',
         player1: state.player1Name || 'Player 1',
         player2: state.player2Name || 'Player 2',
+        phoneNumber: state.phoneNumber || '',
+        department: state.department || '',
         levelsCompleted: 3,
         totalTimeSeconds: finalTotalTime,
         gameStatus: 'victory',
         date: new Date().toISOString().split('T')[0],
       });
-
-      // Fetch updated ranked leaderboard
-      const topData = await getAllTeamsLeaderboard(15);
-      setLeaderboard(topData);
     };
 
-    recordScoreAndFetch();
-  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.totalTimeElapsed]);
+    recordScore();
+  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.phoneNumber, state.department, state.totalTimeElapsed]);
 
   const formatSeconds = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -112,49 +108,6 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
         </div>
       </div>
 
-      {/* Firebase / Local Leaderboard */}
-      <div className="w-full bg-zinc-950/90 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <h3 className="text-xl font-bold text-white font-serif flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-400" /> Shortest Time Leaderboard
-          </h3>
-          <span className="text-xs font-mono text-zinc-400">Firebase Firestore Ranked</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left font-mono text-xs">
-            <thead>
-              <tr className="text-zinc-500 border-b border-zinc-800 uppercase">
-                <th className="pb-2">Rank</th>
-                <th className="pb-2">Team Code</th>
-                <th className="pb-2">Players</th>
-                <th className="pb-2 text-right">Completion Time</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-900">
-              {leaderboard.map((item, idx) => (
-                <tr
-                  key={item.id}
-                  className={`text-zinc-300 ${
-                    item.teamCode === state.teamCode ? 'bg-amber-950/40 text-amber-200 font-bold' : ''
-                  }`}
-                >
-                  <td className="py-3 flex items-center gap-2">
-                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-                  </td>
-                  <td className="py-3 text-red-400 font-bold">{item.teamCode}</td>
-                  <td className="py-3">{item.player1} & {item.player2}</td>
-                  <td className="py-3 text-right font-bold text-emerald-400">
-                    <Clock className="w-3.5 h-3.5 inline mr-1" />
-                    {formatSeconds(item.totalTimeSeconds)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       {/* Restart Button */}
       <button
         onClick={handlePlayAgain}
@@ -165,3 +118,4 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
     </div>
   );
 };
+

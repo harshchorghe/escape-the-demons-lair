@@ -7,6 +7,8 @@ export interface LeaderboardEntry {
   teamName: string;
   player1: string;
   player2: string;
+  phoneNumber?: string;
+  department?: string;
   levelsCompleted: number; // 0, 1, 2, or 3 (3 = Escaped all 3 levels!)
   totalTimeSeconds: number;
   gameStatus: 'victory' | 'playing' | 'disqualified' | 'gameover';

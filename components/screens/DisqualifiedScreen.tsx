@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { GameGameState, gameSync, INITIAL_GAME_STATE } from "@/lib/gameStore";
-import { saveTeamScore, getAllTeamsLeaderboard } from "@/lib/leaderboardService";
+import React, { useEffect } from "react";
+import { GameGameState, gameSync } from "@/lib/gameStore";
+import { saveTeamScore } from "@/lib/leaderboardService";
 import { Skull, AlertOctagon, RotateCcw, Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -12,10 +12,9 @@ interface DisqualifiedScreenProps {
 
 export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state }) => {
   const router = useRouter();
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
   useEffect(() => {
-    const recordFailAndFetch = async () => {
+    const recordFail = async () => {
       const rankTime = state.totalTimeElapsed || 0;
 
       await saveTeamScore({
@@ -23,18 +22,17 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
         teamName: state.teamName || 'Fallen Heroes',
         player1: state.player1Name || 'Player 1',
         player2: state.player2Name || 'Player 2',
+        phoneNumber: state.phoneNumber || '',
+        department: state.department || '',
         levelsCompleted: state.currentLevel > 1 ? state.currentLevel - 1 : 0,
         totalTimeSeconds: rankTime,
         gameStatus: 'disqualified',
         date: new Date().toISOString().split('T')[0],
       });
-
-      const topData = await getAllTeamsLeaderboard(10);
-      setLeaderboard(topData);
     };
 
-    recordFailAndFetch();
-  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.currentLevel, state.totalTimeElapsed]);
+    recordFail();
+  }, [state.teamCode, state.teamName, state.player1Name, state.player2Name, state.phoneNumber, state.department, state.currentLevel, state.totalTimeElapsed]);
 
   const handleReturnToLobby = () => {
     gameSync.resetGame();

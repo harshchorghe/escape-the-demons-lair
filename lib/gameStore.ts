@@ -15,6 +15,8 @@ export interface GameGameState {
   teamName: string;
   player1Name: string;
   player2Name: string;
+  phoneNumber?: string;
+  department?: string;
   isPlayer1Ready: boolean;
   isPlayer2Ready: boolean;
   currentLevel: 1 | 2 | 3 | 4; // 1: Haunted Rooms, 2: Demon Doors, 3: Throne Room, 4: Victory
@@ -55,6 +57,8 @@ export const INITIAL_GAME_STATE: GameGameState = {
   teamName: '',
   player1Name: '',
   player2Name: '',
+  phoneNumber: '',
+  department: '',
   isPlayer1Ready: false,
   isPlayer2Ready: false,
   currentLevel: 1,

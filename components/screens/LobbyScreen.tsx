@@ -5,9 +5,8 @@ import React, { useState } from "react";
 import { useVideoSrc } from "@/hooks/useVideoSrc";
 import { GameGameState, gameSync } from "@/lib/gameStore";
 import { pythonApi } from "@/lib/pythonApi";
-import { LeaderboardModal } from "@/components/ui/LeaderboardModal";
 import LobbyBackground from "@/components/3d/LobbyBackground";
-import { Users, Key, Play, ShieldAlert, CheckCircle2, Copy, Check, ArrowRight, ShieldCheck, Trophy } from "lucide-react";
+import { Users, Key, Play, ShieldAlert, CheckCircle2, Copy, Check, ArrowRight, ShieldCheck } from "lucide-react";
 
 interface LobbyScreenProps {
   state: GameGameState;
@@ -23,9 +22,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   onStartMission,
 }) => {
   const lobbyVideoSrc = useVideoSrc('lobby', '/videos/level.mp4');
-  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [player1Input, setPlayer1Input] = useState(state.player1Name || '');
   const [teamNameInput, setTeamNameInput] = useState(state.teamName || '');
+  const [phoneInput, setPhoneInput] = useState(state.phoneNumber || '');
+  const [deptInput, setDeptInput] = useState(state.department || '');
   const [player2Input, setPlayer2Input] = useState(state.player2Name || '');
   const [inputCode, setInputCode] = useState('');
 
@@ -55,6 +55,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       setErrorMsg('Please enter a Team Name.');
       return;
     }
+    if (!phoneInput.trim()) {
+      setErrorMsg('Please enter your Phone Number.');
+      return;
+    }
+    if (!deptInput.trim()) {
+      setErrorMsg('Please enter your Department.');
+      return;
+    }
     setErrorMsg('');
     const code = generateTeamCode();
     setMyRole('player1');
@@ -62,6 +70,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       teamCode: code,
       teamName: teamNameInput.trim(),
       player1Name: player1Input.trim(),
+      phoneNumber: phoneInput.trim(),
+      department: deptInput.trim(),
       isPlayer1Ready: true,
       gameStatus: 'lobby',
     });
@@ -184,13 +194,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             <p className="text-sm text-zinc-400 max-w-3xl mx-auto mb-4">
               Form a 2-player team, solve haunted rooms, decode demon door ciphers, and unite in the Throne Room to seal the Demon Lord.
             </p>
-            <button
-              onClick={() => setIsLeaderboardOpen(true)}
-              className="inline-flex items-center gap-2 bg-amber-950/60 border border-amber-500/50 hover:bg-amber-900/60 text-amber-300 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-lg shadow-amber-950/40"
-            >
-              <Trophy className="w-4 h-4 text-amber-400" />
-              🏆 View Hall of Fame Leaderboard
-            </button>
           </div>
         </section>
 
@@ -237,6 +240,30 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                             value={teamNameInput}
                             onChange={(e) => setTeamNameInput(e.target.value)}
                             placeholder="e.g. Demon Slayers"
+                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-mono text-zinc-300 uppercase mb-1">
+                            Phone Number
+                          </label>
+                          <input
+                            type="tel"
+                            value={phoneInput}
+                            onChange={(e) => setPhoneInput(e.target.value)}
+                            placeholder="e.g. +91 9876543210"
+                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-mono text-zinc-300 uppercase mb-1">
+                            Department
+                          </label>
+                          <input
+                            type="text"
+                            value={deptInput}
+                            onChange={(e) => setDeptInput(e.target.value)}
+                            placeholder="e.g. Computer Science / IT"
                             className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg outline-none"
                           />
                         </div>
@@ -435,11 +462,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </div>
         </section>
       </div>
-      <LeaderboardModal
-        isOpen={isLeaderboardOpen}
-        onClose={() => setIsLeaderboardOpen(false)}
-        currentTeamCode={state.teamCode}
-      />
     </div>
   );
 };
