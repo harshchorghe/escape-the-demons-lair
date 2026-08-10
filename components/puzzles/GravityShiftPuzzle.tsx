@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Key } from "lucide-react";
 
 interface GravityShiftPuzzleProps {
@@ -23,9 +23,9 @@ const STAGE_MAPS: Record<number, string[][]> = {
   1: [
     ['W','W','W','W','W','W','W','W','W','W','W','W','W'],
     ['W','P','.','.','.','.','.','.','.','.','.','.','W'],
-    ['W','.','W','T','.','W','.','.','.','W','.','.',  'W'],
+    ['W','.','W','T','.','W','.','.','.','W','.','.','W'],
     ['W','.','.','.','.','.','.','K','.','.','.','T','W'],  // K1: row3,col7 — top-center area
-    ['W','.','T','W','.','.','W','.','T','.','.','.',  'W'],
+    ['W','.','T','W','.','.','W','.','T','.','.','.','W'],
     ['W','.','.','.','.','W','.','.','.','.','.','T','W'],
     ['W','.','W','T','.','.','.','.','.','.','K','.','W'],  // K2: row6,col10 — mid-right area
     ['W','.','.','.','.','.','.','W','.','T','.','.','W'],
@@ -44,7 +44,7 @@ const STAGE_MAPS: Record<number, string[][]> = {
     ['W','.','W','.','.','T','.','.','K','.','T','.','W'],  // K1: row3,col8 — upper-right-mid
     ['W','.','.','.','.','.','.','.','.','W','.','.','W'],
     ['W','.','W','T','.','.','W','.','.','.','.','.','W'],
-    ['W','.','.','.','.','.','.','.','.','T','.','.',  'W'],
+    ['W','.','.','.','.','.','.','.','.','T','.','.','W'],
     ['W','T','.','.','.','W','.','T','.','.','W','.','W'],
     ['W','.','K','.','.','.','.','.','.','.','.','T','W'],  // K2: row8,col2 — lower-left-mid
     ['W','.','.','T','.','.','.','.','.','W','.','.','W'],
@@ -63,15 +63,13 @@ const STAGE_MAPS: Record<number, string[][]> = {
     ['W','.','T','W','.','.','.','.','.','.','.','.','W'],
     ['W','.','.','.','.','W','.','.','W','.','.','.','W'],
     ['W','.','K','.','.','.','.','.','.','T','.','.','W'],  // K2: row7,col2 — mid-left
-    ['W','.','.','T','.','.','W','.','.','.','.','.',  'W'],
+    ['W','.','.','T','.','.','W','.','.','.','.','.','W'],
     ['W','.','W','.','.','.','.','.','.','W','.','.','W'],
     ['W','.','.','.','.','.','.','K','.','.','.','T','W'],  // K3: row10,col7 — lower-center
     ['W','.','.','.','.','W','.','.','.','.','.','E','W'],  // E: row11,col11 - Exit
     ['W','W','W','W','W','W','W','W','W','W','W','W','W'],
   ],
 };
-
-
 
 function buildBaseMap(raw: string[][]): string[][] {
   return raw.map(row => row.map(cell => (cell === 'P' || cell === 'K' ? '.' : cell)));
@@ -162,9 +160,9 @@ function selectRandomKeyPositions(reachable: Position[], count: number): Set<str
 }
 
 export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberId, onSolve }) => {
-  const rawMap = STAGE_MAPS[chamberId] || STAGE_MAPS[1];
-  const baseMap = buildBaseMap(rawMap);
-  const startPos = findStart(rawMap);
+  const rawMap = useMemo(() => STAGE_MAPS[chamberId] || STAGE_MAPS[1], [chamberId]);
+  const baseMap = useMemo(() => buildBaseMap(rawMap), [rawMap]);
+  const startPos = useMemo(() => findStart(rawMap), [rawMap]);
 
   const [player, setPlayer] = useState<Position>(startPos);
   const [collectedKeySet, setCollectedKeySet] = useState<Set<string>>(new Set());
@@ -174,7 +172,8 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
   const [trapHit, setTrapHit] = useState<boolean>(false);
   const [isSolved, setIsSolved] = useState<boolean>(false);
 
-  const randomizeKeys = useCallback(() => {
+  // Initialize random key positions ONCE when chamberId changes (keeps key positions fixed during play)
+  useEffect(() => {
     const reachable = getReachableFloorCells(rawMap);
     const numKeys = 4;
     const newKeys = selectRandomKeyPositions(reachable, numKeys);
@@ -185,11 +184,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
     setTrapHit(false);
     setIsSolved(false);
     setGravityDir(null);
-  }, [rawMap, startPos]);
-
-  useEffect(() => {
-    randomizeKeys();
-  }, [chamberId, randomizeKeys]);
+  }, [chamberId, rawMap, startPos]);
 
   const totalKeys = keyPositions.size > 0 ? keyPositions.size : 4;
   const collectedKeys = collectedKeySet.size;
@@ -261,7 +256,12 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
   }, [shiftGravity]);
 
   const handleReset = () => {
-    randomizeKeys();
+    setPlayer(startPos);
+    setCollectedKeySet(new Set());
+    setMoveCount(0);
+    setTrapHit(false);
+    setIsSolved(false);
+    setGravityDir(null);
   };
 
   const btnBase = "p-3 rounded-xl border font-mono font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer active:scale-95";
