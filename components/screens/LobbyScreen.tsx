@@ -8,8 +8,6 @@ import { pythonApi } from "@/lib/pythonApi";
 import LobbyBackground from "@/components/3d/LobbyBackground";
 import { Users, Key, Play, ShieldAlert, CheckCircle2, Copy, Check, ArrowRight, ShieldCheck } from "lucide-react";
 
-import { modelCache } from "@/lib/modelCache";
-
 interface LobbyScreenProps {
   state: GameGameState;
   myRole: 'player1' | 'player2';
@@ -24,16 +22,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   onStartMission,
 }) => {
   const lobbyVideoSrc = useVideoSrc('lobby', '/videos/level.mp4');
-
-  // Preload Level 3 3D assets in background during Lobby phase
-  React.useEffect(() => {
-    modelCache.preload([
-      '/models/tatami.glb',
-      '/models/player1.glb',
-      '/models/player2.glb',
-      '/models/demon.glb',
-    ]);
-  }, []);
 
   const [player1Input, setPlayer1Input] = useState(state.player1Name || '');
   const [teamNameInput, setTeamNameInput] = useState(state.teamName || '');

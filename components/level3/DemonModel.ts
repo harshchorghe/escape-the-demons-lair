@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { modelCache } from '@/lib/modelCache';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 /**
  * DemonModel
@@ -32,78 +32,102 @@ export class DemonModel {
   }
 
   /**
-   * Load demon.glb from cache or fetch asynchronously, configure transforms, enable shadows, wire animations.
+   * Load demon.glb, configure transforms, enable shadows, wire animations.
    * Calls onReady() when the model is fully set up and added to the scene.
    */
   load(url: string = '/models/demon.glb', onReady?: () => void) {
     this.isDisposed = false;
-
-    modelCache.loadGLTF(url).then((gltfData) => {
-      if (this.isDisposed) return;
-
-      const cloned = modelCache.getCloned(url);
-      const model = cloned ? cloned.scene : gltfData.scene.clone(true);
-      const animations = gltfData.animations;
-
-      // ── 1. Scale: Boss / Enemy Size (target height ~3.6 units, dominant & intimidating)
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const targetHeight = 3.6; // Large boss scale
-      const scale = targetHeight / Math.max(size.y, 0.001);
-      model.scale.setScalar(scale);
-
-      // ── 2. Position: Feet grounded properly on tatami floor (y = 0)
-      const scaledBox = new THREE.Box3().setFromObject(model);
-      model.position.y = -scaledBox.min.y;
-
-      // ── 3. Rotation: Model aligned with group forward direction (0 offset)
-      model.rotation.y = 0;
-
-      // ── 4. Shadows: Enable castShadow & receiveShadow on ALL meshes
-      model.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
-
-      // ── 5. Animations: Parse and map all clip names
-      if (animations && animations.length > 0) {
-        this.mixer = new THREE.AnimationMixer(model);
-
-        for (const clip of animations) {
-          const name = clip.name.toLowerCase();
-          this.clips.set(name, clip);
-
-          if (name.includes('idle') || name.includes('stand') || name.includes('breath') || name.includes('stay') || name.includes('default')) {
-            if (!this.semanticClips.has('idle')) this.semanticClips.set('idle', clip);
-          }
-          if (name.includes('walk') || name.includes('run') || name.includes('chase') || name.includes('move') || name.includes('step') || name.includes('locomotion')) {
-            if (!this.semanticClips.has('walk')) this.semanticClips.set('walk', clip);
-            if (!this.semanticClips.has('walking')) this.semanticClips.set('walking', clip);
-            if (!this.semanticClips.has('run')) this.semanticClips.set('run', clip);
-          }
-          if (name.includes('attack') || name.includes('slash') || name.includes('hit') || name.includes('strike') || name.includes('swing') || name.includes('combo')) {
-            if (!this.semanticClips.has('attack')) this.semanticClips.set('attack', clip);
-          }
-          if (name.includes('death') || name.includes('die') || name.includes('dead') || name.includes('defeat') || name.includes('down') || name.includes('fall')) {
-            if (!this.semanticClips.has('death')) this.semanticClips.set('death', clip);
-          }
+    const loader = new GLTFLoader();
+    loader.load(
+      url,
+      (gltf) => {
+        // If dispose() was called while GLB was loading async, clean up immediately
+        if (this.isDisposed) {
+          gltf.scene.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              if (child.geometry) child.geometry.dispose();
+              if (child.material) {
+                if (Array.isArray(child.material)) {
+                  child.material.forEach((m) => {
+                    if (m.map) m.map.dispose();
+                    m.dispose();
+                  });
+                } else {
+                  if (child.material.map) child.material.map.dispose();
+                  child.material.dispose();
+                }
+              }
+            }
+          });
+          return;
         }
 
-        // Pre-play idle on spawn & tick mixer frame 0 BEFORE adding model to scene to guarantee ZERO T-pose frames
-        this.playAnimation('idle');
-        this.mixer.update(0);
+        const model = gltf.scene;
+
+        // ── 1. Scale: Boss / Enemy Size (target height ~3.6 units, dominant & intimidating)
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const targetHeight = 3.6; // Large boss scale
+        const scale = targetHeight / Math.max(size.y, 0.001);
+        model.scale.setScalar(scale);
+
+        // ── 2. Position: Feet grounded properly on tatami floor (y = 0)
+        const scaledBox = new THREE.Box3().setFromObject(model);
+        model.position.y = -scaledBox.min.y;
+
+        // ── 3. Rotation: Model aligned with group forward direction (0 offset)
+        model.rotation.y = 0;
+
+        // ── 4. Shadows: Enable castShadow & receiveShadow on ALL meshes
+        model.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+
+        // ── 5. Animations: Parse and map all clip names
+        if (gltf.animations && gltf.animations.length > 0) {
+          this.mixer = new THREE.AnimationMixer(model);
+
+          console.log(`[DemonModel] Loaded clips for ${url}:`, gltf.animations.map(a => a.name));
+
+          for (const clip of gltf.animations) {
+            const name = clip.name.toLowerCase();
+            this.clips.set(name, clip);
+
+            if (name.includes('idle') || name.includes('stand') || name.includes('breath') || name.includes('stay') || name.includes('default')) {
+              if (!this.semanticClips.has('idle')) this.semanticClips.set('idle', clip);
+            }
+            if (name.includes('walk') || name.includes('run') || name.includes('chase') || name.includes('move') || name.includes('step') || name.includes('locomotion')) {
+              if (!this.semanticClips.has('walk')) this.semanticClips.set('walk', clip);
+              if (!this.semanticClips.has('walking')) this.semanticClips.set('walking', clip);
+              if (!this.semanticClips.has('run')) this.semanticClips.set('run', clip);
+            }
+            if (name.includes('attack') || name.includes('slash') || name.includes('hit') || name.includes('strike') || name.includes('swing') || name.includes('combo')) {
+              if (!this.semanticClips.has('attack')) this.semanticClips.set('attack', clip);
+            }
+            if (name.includes('death') || name.includes('die') || name.includes('dead') || name.includes('defeat') || name.includes('down') || name.includes('fall')) {
+              if (!this.semanticClips.has('death')) this.semanticClips.set('death', clip);
+            }
+          }
+
+          // Pre-play idle on spawn & tick mixer frame 0 BEFORE adding model to scene to guarantee ZERO T-pose frames
+          this.playAnimation('idle');
+          this.mixer.update(0);
+        }
+
+        this.group.add(model);
+        this.scene.add(this.group);
+
+        this.isReady = true;
+        if (onReady) onReady();
+      },
+      undefined,
+      (err) => {
+        console.error('[DemonModel] Failed to load demon.glb:', err);
       }
-
-      this.group.add(model);
-      this.scene.add(this.group);
-
-      this.isReady = true;
-      if (onReady) onReady();
-    }).catch((err) => {
-      console.error('[DemonModel] Failed to load demon.glb:', err);
-    });
+    );
   }
 
   /**

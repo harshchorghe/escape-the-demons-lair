@@ -11,8 +11,6 @@ import { CombatEngine, CombatStats } from "@/components/level3/CombatEngine";
 import { sound } from "@/components/level3/SoundSynthesizer";
 import { Flame, Volume2, VolumeX, HelpCircle } from "lucide-react";
 
-import { modelCache } from "@/lib/modelCache";
-
 interface FinalLevelScreenProps {
   state: GameGameState;
   myRole: 'player1' | 'player2';
@@ -24,16 +22,6 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
   const characterRef = useRef<DemonSlayerCharacter | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-
-  // Preload all Level 3 3D models in background as soon as component is mounted
-  useEffect(() => {
-    modelCache.preload([
-      '/models/tatami.glb',
-      '/models/player1.glb',
-      '/models/player2.glb',
-      '/models/demon.glb',
-    ]);
-  }, []);
 
   const [stats, setStats] = useState<CombatStats>({
     playerHp: 100,
@@ -118,14 +106,13 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
     const { demonFire, floorGlow } = buildArena(scene);
     const embers = buildSkySphere(scene);
 
-    // Load tatami.glb as arena floor via modelCache
+    // Load tatami.glb as arena floor
     let tatamiModel: THREE.Group | null = null;
     let isMounted = true;
-    modelCache.loadGLTF('/models/tatami.glb').then((gltfData) => {
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('/models/tatami.glb', (gltf) => {
       if (!isMounted) return;
-      const cloned = modelCache.getCloned('/models/tatami.glb');
-      const model = cloned ? cloned.scene : gltfData.scene.clone(true);
-
+      const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
