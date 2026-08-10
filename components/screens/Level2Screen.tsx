@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
-import { getLevel2PhysicsConfig, DEFAULT_LEVEL2_PHYSICS, Level2PhysicsConfig } from "@/lib/physicsService";
+import { getLevel2PhysicsConfig, subscribeToLevel2PhysicsConfig, DEFAULT_LEVEL2_PHYSICS, Level2PhysicsConfig } from "@/lib/physicsService";
 
 interface Level2ScreenProps {
   state: GameGameState;
@@ -92,10 +92,10 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   const bgScrollXRef = useRef(0);
   const skylineScrollXRef = useRef(0);
   const groundScrollXRef = useRef(0);
+  const pipeSpawnTimerRef = useRef(0);
   
   const lastJumpTimeRef = useRef(0);
   const scoreRef = useRef(0);
-  const targetScore = 21;
 
   // Refs mirroring state for use inside long-running loops (hand detection, keyboard handler)
   // This prevents stale closures from capturing old state values
@@ -114,13 +114,14 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   useEffect(() => { controlModeRef.current = controlMode; }, [controlMode]);
   useEffect(() => { isCameraEnabledRef.current = isCameraEnabled; }, [isCameraEnabled]);
 
-  // Remote Physics & Speed Configuration (Fetched from Firebase / Backend)
+  // Remote Physics & Speed Configuration (Fetched from Firebase / Backend in real-time)
   const physicsRef = useRef<Level2PhysicsConfig>(DEFAULT_LEVEL2_PHYSICS);
 
   useEffect(() => {
-    getLevel2PhysicsConfig().then((config) => {
+    const unsubscribe = subscribeToLevel2PhysicsConfig((config) => {
       physicsRef.current = config;
     });
+    return () => unsubscribe();
   }, []);
 
   // Constants (Canvas bounds)
@@ -398,6 +399,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
     birdRef.current.angle = 0;
     pipesRef.current = [];
     particlesRef.current = [];
+    pipeSpawnTimerRef.current = 0;
     scoreRef.current = 0;
     setScore(0);
     setIsGameOver(false);
@@ -429,6 +431,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
     
     pipesRef.current = [];
     particlesRef.current = [];
+    pipeSpawnTimerRef.current = 0;
     scoreRef.current = 0;
     setScore(0);
     setIsPlaying(true);
@@ -512,26 +515,29 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
     const newLives = Math.max(0, lives - 1);
     setLives(newLives);
 
+    const penalty = physicsRef.current.timePenalty || 15;
+    const maxLives = physicsRef.current.maxLives || 3;
+
     if (newLives > 0) {
       setFeedback({ 
         success: false, 
-        message: `💥 Demonic Trap Triggered! −15s penalty! ${newLives} ${newLives === 1 ? 'life' : 'lives'} remaining.` 
+        message: `💥 Demonic Trap Triggered! −${penalty}s penalty! ${newLives} ${newLives === 1 ? 'life' : 'lives'} remaining.` 
       });
 
       // Update global state with time penalty
       gameSync.updateState((prev) => {
-        const nextTime = Math.max(0, prev.timeRemaining - 15);
+        const nextTime = Math.max(0, prev.timeRemaining - penalty);
         return {
           ...prev,
           timeRemaining: nextTime,
-          timePenalties: prev.timePenalties + 15,
+          timePenalties: prev.timePenalties + penalty,
           gameStatus: nextTime <= 0 ? 'disqualified' : prev.gameStatus,
         };
       });
     } else {
       setFeedback({ 
         success: false, 
-        message: `☠️ No current lives left! 3/3 attempts failed. Disqualified!` 
+        message: `☠️ No current lives left! ${maxLives}/${maxLives} attempts failed. Disqualified!` 
       });
 
       // Automatically transition to Disqualification Page after 2 seconds pop-up preview
@@ -596,7 +602,8 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
       // Delta time normalization factor (16.67ms = 60 FPS = 1.0)
       const deltaMs = nowTime - lastTime;
       lastTime = nowTime;
-      const dt = Math.min(Math.max(deltaMs / 16.67, 0.5), 2.5);
+      // Allow scaling down to 144Hz/240Hz monitors without forcing dt up to 0.5
+      const dt = Math.min(Math.max(deltaMs / 16.67, 0.1), 2.5);
 
       const phys = physicsRef.current;
       
@@ -628,8 +635,11 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           handleCrash();
         }
 
-        // Dynamic difficulty/speed boost after passing 15th pillar
-        const isSpeedBoosted = scoreRef.current >= 15;
+        // Dynamic difficulty/speed boost threshold from Firebase config
+        const speedBoostThreshold = phys.speedBoostThreshold || 15;
+        const targetScore = phys.targetScore || 21;
+
+        const isSpeedBoosted = scoreRef.current >= speedBoostThreshold;
         const baseSpeed = isSpeedBoosted ? phys.pipeSpeedBoost : phys.pipeSpeed;
         const currentPipeSpeed = baseSpeed * dt;
         const currentSpawnInterval = Math.max(30, Math.round(phys.pipeSpawnInterval * (isSpeedBoosted ? 0.68 : 1.0)));
@@ -639,9 +649,11 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
         skylineScrollXRef.current = (skylineScrollXRef.current - 0.9 * dt) % CANVAS_WIDTH;
         groundScrollXRef.current = (groundScrollXRef.current - currentPipeSpeed) % CANVAS_WIDTH;
 
-        // Spawn pipes
-        if (frameCount % currentSpawnInterval === 0) {
+        // Time-accumulated pipe spawn (independent of display refresh rate / Hz)
+        pipeSpawnTimerRef.current += dt;
+        if (pipeSpawnTimerRef.current >= currentSpawnInterval) {
           spawnPipe();
+          pipeSpawnTimerRef.current -= currentSpawnInterval;
         }
 
         // Update pipes
@@ -649,7 +661,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           const pipe = pipesRef.current[i];
           pipe.x -= currentPipeSpeed;
 
-          // Check score pass (Pass 21 pillars to complete Level 2!)
+          // Check score pass
           if (!pipe.passed && pipe.x + pipe.width / 2 < bird.x) {
             pipe.passed = true;
             scoreRef.current += 1;
@@ -657,7 +669,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
             setScore(newScore);
             updateHighScore(newScore);
 
-            if (newScore === 15) {
+            if (newScore === speedBoostThreshold) {
               setFeedback({
                 success: true,
                 message: '⚡ SPEED BOOST! Winds accelerating for the final stretch! ⚡'
@@ -670,7 +682,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
               l2Score: Math.max(prev.l2Score || 0, newScore),
             }));
 
-            // Automatically complete Level 2 when 21 pillars are passed!
+            // Automatically complete Level 2 when target pillars are passed!
             if (newScore >= targetScore) {
               triggerVictory();
             }
@@ -1184,15 +1196,15 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
         
         {/* Left/Center Column: Canvas Game (7 cols on md+) */}
         <div className="md:col-span-7 flex flex-col items-center">
-          <div className="relative border-4 border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-zinc-950 group select-none">
+          <div className="relative border-4 border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-zinc-950 group select-none w-full max-w-[400px]">
             
             {/* Score HUD overlays */}
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-xl text-white font-mono text-sm shadow">
               <Trophy className="w-4 h-4 text-yellow-400" />
-              <span>Pillars: <strong className="text-yellow-400 font-bold">{score} / {targetScore}</strong></span>
-              {score >= 15 && (
+              <span>Pillars: <strong className="text-yellow-400 font-bold">{score} / {physicsRef.current.targetScore || 21}</strong></span>
+              {score >= (physicsRef.current.speedBoostThreshold || 15) && (
                 <span className="ml-1 text-[10px] font-bold bg-amber-500/20 border border-amber-500/50 text-amber-400 px-1.5 py-0.5 rounded animate-pulse">
-                  ⚡ 2.4x SPEED
+                  ⚡ SPEED BOOST
                 </span>
               )}
             </div>
@@ -1217,7 +1229,11 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
               width={CANVAS_WIDTH}
               height={CANVAS_HEIGHT}
               onClick={triggerJump}
-              className="cursor-pointer block touch-none"
+              onTouchStart={(e) => {
+                e.preventDefault();
+                triggerJumpRef.current();
+              }}
+              className="cursor-pointer block touch-none w-full max-w-[400px] h-auto aspect-[400/520]"
             />
 
             {/* HTML absolute visual overlays for menus / retry / countdown */}
@@ -1330,7 +1346,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                     <div className="space-y-2">
                       <h3 className="text-2xl font-extrabold text-yellow-400 uppercase tracking-wider">Demonic Cavern</h3>
                       <p className="text-xs text-zinc-300 max-w-[280px] leading-relaxed font-sans">
-                        Fly through <strong className="text-yellow-400">21 toxic pillars</strong> to unlock the portal to Level 3!
+                        Fly through <strong className="text-yellow-400">{physicsRef.current.targetScore || 21} toxic pillars</strong> to unlock the portal to Level 3!
                       </p>
                     </div>
                     <div className="flex flex-col gap-2">
