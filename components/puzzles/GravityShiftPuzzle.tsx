@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Key } from "lucide-react";
 
 interface GravityShiftPuzzleProps {
@@ -23,9 +23,9 @@ const STAGE_MAPS: Record<number, string[][]> = {
   1: [
     ['W','W','W','W','W','W','W','W','W','W','W','W','W'],
     ['W','P','.','.','.','.','.','.','.','.','.','.','W'],
-    ['W','.','W','T','.','W','.','.','.','W','.','.',  'W'],
+    ['W','.','W','T','.','W','.','.','.','W','.','.','W'],
     ['W','.','.','.','.','.','.','K','.','.','.','T','W'],  // K1: row3,col7 — top-center area
-    ['W','.','T','W','.','.','W','.','T','.','.','.',  'W'],
+    ['W','.','T','W','.','.','W','.','T','.','.','.','W'],
     ['W','.','.','.','.','W','.','.','.','.','.','T','W'],
     ['W','.','W','T','.','.','.','.','.','.','K','.','W'],  // K2: row6,col10 — mid-right area
     ['W','.','.','.','.','.','.','W','.','T','.','.','W'],
@@ -44,7 +44,7 @@ const STAGE_MAPS: Record<number, string[][]> = {
     ['W','.','W','.','.','T','.','.','K','.','T','.','W'],  // K1: row3,col8 — upper-right-mid
     ['W','.','.','.','.','.','.','.','.','W','.','.','W'],
     ['W','.','W','T','.','.','W','.','.','.','.','.','W'],
-    ['W','.','.','.','.','.','.','.','.','T','.','.',  'W'],
+    ['W','.','.','.','.','.','.','.','.','T','.','.','W'],
     ['W','T','.','.','.','W','.','T','.','.','W','.','W'],
     ['W','.','K','.','.','.','.','.','.','.','.','T','W'],  // K2: row8,col2 — lower-left-mid
     ['W','.','.','T','.','.','.','.','.','W','.','.','W'],
@@ -63,7 +63,7 @@ const STAGE_MAPS: Record<number, string[][]> = {
     ['W','.','T','W','.','.','.','.','.','.','.','.','W'],
     ['W','.','.','.','.','W','.','.','W','.','.','.','W'],
     ['W','.','K','.','.','.','.','.','.','T','.','.','W'],  // K2: row7,col2 — mid-left
-    ['W','.','.','T','.','.','W','.','.','.','.','.',  'W'],
+    ['W','.','.','T','.','.','W','.','.','.','.','.','W'],
     ['W','.','W','.','.','.','.','.','.','W','.','.','W'],
     ['W','.','.','.','.','.','.','K','.','.','.','T','W'],  // K3: row10,col7 — lower-center
     ['W','.','.','.','.','W','.','.','.','.','.','E','W'],  // E: row11,col11 - Exit
@@ -71,10 +71,8 @@ const STAGE_MAPS: Record<number, string[][]> = {
   ],
 };
 
-
-
 function buildBaseMap(raw: string[][]): string[][] {
-  return raw.map(row => row.map(cell => (cell === 'P' ? '.' : cell)));
+  return raw.map(row => row.map(cell => (cell === 'P' || cell === 'K' ? '.' : cell)));
 }
 
 function findStart(raw: string[][]): Position {
@@ -86,25 +84,109 @@ function findStart(raw: string[][]): Position {
   return { r: 1, c: 1 };
 }
 
-function countKeys(raw: string[][]): number {
-  let count = 0;
-  raw.forEach(row => row.forEach(cell => { if (cell === 'K') count++; }));
-  return count;
+function getReachableFloorCells(rawMap: string[][]): Position[] {
+  const R = rawMap.length;
+  const C = rawMap[0].length;
+  const start = findStart(rawMap);
+  const visited = Array.from({ length: R }, () => Array(C).fill(false));
+  const queue: Position[] = [start];
+  visited[start.r][start.c] = true;
+
+  const reachable: Position[] = [];
+
+  // Movement directions in grid (8 directions)
+  const dr = [-1, 1, 0, 0, -1, -1, 1, 1];
+  const dc = [0, 0, -1, 1, -1, 1, -1, 1];
+
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+
+    for (let i = 0; i < 8; i++) {
+      const nr = curr.r + dr[i];
+      const nc = curr.c + dc[i];
+
+      if (nr >= 0 && nr < R && nc >= 0 && nc < C && !visited[nr][nc]) {
+        const cell = rawMap[nr][nc];
+        if (cell !== 'W' && cell !== 'T') {
+          visited[nr][nc] = true;
+          queue.push({ r: nr, c: nc });
+
+          // Key candidate: floor cell, not Start 'P', not Exit 'E'
+          if (cell !== 'P' && cell !== 'E') {
+            reachable.push({ r: nr, c: nc });
+          }
+        }
+      }
+    }
+  }
+
+  return reachable;
+}
+
+function selectRandomKeyPositions(reachable: Position[], count: number): Set<string> {
+  const result = new Set<string>();
+  if (reachable.length === 0) return result;
+
+  const pool = [...reachable];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  const chosen: Position[] = [];
+  for (const pos of pool) {
+    if (chosen.length >= count) break;
+    const isFarEnough = chosen.every(
+      p => Math.abs(p.r - pos.r) + Math.abs(p.c - pos.c) >= 3
+    );
+    if (isFarEnough) {
+      chosen.push(pos);
+      result.add(`${pos.r},${pos.c}`);
+    }
+  }
+
+  if (chosen.length < count) {
+    for (const pos of pool) {
+      if (chosen.length >= count) break;
+      const key = `${pos.r},${pos.c}`;
+      if (!result.has(key)) {
+        chosen.push(pos);
+        result.add(key);
+      }
+    }
+  }
+
+  return result;
 }
 
 export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberId, onSolve }) => {
-  const rawMap = STAGE_MAPS[chamberId] || STAGE_MAPS[1];
-  const baseMap = buildBaseMap(rawMap);
-  const startPos = findStart(rawMap);
-  const totalKeys = countKeys(rawMap);
+  const rawMap = useMemo(() => STAGE_MAPS[chamberId] || STAGE_MAPS[1], [chamberId]);
+  const baseMap = useMemo(() => buildBaseMap(rawMap), [rawMap]);
+  const startPos = useMemo(() => findStart(rawMap), [rawMap]);
 
   const [player, setPlayer] = useState<Position>(startPos);
   const [collectedKeySet, setCollectedKeySet] = useState<Set<string>>(new Set());
+  const [keyPositions, setKeyPositions] = useState<Set<string>>(new Set());
   const [gravityDir, setGravityDir] = useState<Direction | null>(null);
   const [moveCount, setMoveCount] = useState<number>(0);
   const [trapHit, setTrapHit] = useState<boolean>(false);
   const [isSolved, setIsSolved] = useState<boolean>(false);
 
+  // Initialize random key positions ONCE when chamberId changes (keeps key positions fixed during play)
+  useEffect(() => {
+    const reachable = getReachableFloorCells(rawMap);
+    const numKeys = 4;
+    const newKeys = selectRandomKeyPositions(reachable, numKeys);
+    setKeyPositions(newKeys);
+    setCollectedKeySet(new Set());
+    setPlayer(startPos);
+    setMoveCount(0);
+    setTrapHit(false);
+    setIsSolved(false);
+    setGravityDir(null);
+  }, [chamberId, rawMap, startPos]);
+
+  const totalKeys = keyPositions.size > 0 ? keyPositions.size : 4;
   const collectedKeys = collectedKeySet.size;
 
   const shiftGravity = useCallback((dir: Direction) => {
@@ -138,7 +220,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
     setPlayer({ r: nextR, c: nextC });
 
     const nextCollectedSet = new Set(collectedKeySet);
-    if (baseCell === 'K' && !nextCollectedSet.has(keyId)) {
+    if (keyPositions.has(keyId) && !nextCollectedSet.has(keyId)) {
       nextCollectedSet.add(keyId);
       setCollectedKeySet(nextCollectedSet);
     }
@@ -149,7 +231,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
       setIsSolved(true);
       setTimeout(() => onSolve("GRAVITY_SOLVED"), 500);
     }
-  }, [baseMap, isSolved, player, collectedKeySet, totalKeys, startPos, onSolve]);
+  }, [baseMap, isSolved, player, collectedKeySet, keyPositions, totalKeys, startPos, onSolve]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -234,7 +316,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
                   const isWall   = baseCell === 'W';
                   const isTrap   = baseCell === 'T';
                   const keyId    = `${rIdx},${cIdx}`;
-                  const isKeyUncollected = baseCell === 'K' && !collectedKeySet.has(keyId);
+                  const isKeyUncollected = keyPositions.has(keyId) && !collectedKeySet.has(keyId);
                   const exitUnlocked = collectedKeys >= totalKeys;
 
                   return (
