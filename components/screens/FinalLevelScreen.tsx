@@ -9,7 +9,7 @@ import { DemonSlayerCharacter } from "@/components/level3/DemonSlayerCharacter";
 import { EffectsEngine } from "@/components/level3/EffectsEngine";
 import { CombatEngine, CombatStats } from "@/components/level3/CombatEngine";
 import { sound } from "@/components/level3/SoundSynthesizer";
-import { Flame, Volume2, VolumeX, HelpCircle } from "lucide-react";
+import { Flame, Volume2, VolumeX, HelpCircle, Eye } from "lucide-react";
 
 interface FinalLevelScreenProps {
   state: GameGameState;
@@ -56,6 +56,10 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
   // ── Player HP values for dual display ──
   const p1Hp = myRole === 'player1' ? stats.playerHp : (state.p1Pos?.hp ?? 100);
   const p2Hp = myRole === 'player2' ? stats.playerHp : (state.p2Pos?.hp ?? 100);
+  const myHp = myRole === 'player1' ? p1Hp : p2Hp;
+  const partnerHp = myRole === 'player1' ? p2Hp : p1Hp;
+  const partnerName = myRole === 'player1' ? (state.player2Name || 'PLAYER 2') : (state.player1Name || 'PLAYER 1');
+  const isLocalDead = myHp <= 0;
   const p1MaxHp = 100;
   const p2MaxHp = 100;
 
@@ -351,6 +355,26 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
         }
       }
 
+      // Periodic Firestore sync (~1s) so remote cross-device players stay synchronized
+      if (frameCounter % 60 === 0) {
+        const charPos = character.group.position;
+        const charRot = character.group.rotation.y;
+        const localPosData = {
+          x: charPos.x,
+          z: charPos.z,
+          rot: charRot,
+          state: isLocalAlive ? character.state : 'die',
+          alive: isLocalAlive,
+          hp: Math.max(0, combat.playerHp),
+        };
+
+        if (myRole === 'player1') {
+          gameSync.updateState({ p1Pos: localPosData });
+        } else {
+          gameSync.updateState({ p2Pos: localPosData });
+        }
+      }
+
       // Smoothly update remote partner position & animation
       const partnerPosData = myRole === 'player1' ? stateRef.current.p2Pos : stateRef.current.p1Pos;
       if (partnerPosData && partnerCharacter) {
@@ -433,8 +457,15 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       demonFire.intensity = 4 + Math.sin(elapsedTime * 3.5) * 1.5;
       floorGlow.intensity = 3 + Math.sin(elapsedTime * 2.8 + 1.2) * 1.0;
 
-      const charPos = character.group.position;
-      controls.target.lerp(new THREE.Vector3(charPos.x, charPos.y + 1.2, charPos.z), 0.1);
+      // Spectator Mode Camera Tracking:
+      // When local player is dead, track and follow the active surviving teammate!
+      if (!isLocalAlive && isPartnerAliveChecked && partnerCharacter) {
+        const partnerPos = partnerCharacter.group.position;
+        controls.target.lerp(new THREE.Vector3(partnerPos.x, partnerPos.y + 1.2, partnerPos.z), 0.1);
+      } else {
+        const charPos = character.group.position;
+        controls.target.lerp(new THREE.Vector3(charPos.x, charPos.y + 1.2, charPos.z), 0.1);
+      }
       controls.update();
 
       renderer.render(scene, camera);
@@ -503,6 +534,13 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 
           {/* Top Center: Combo Counter & Live Announcement */}
           <div className="flex flex-col items-center justify-center text-center space-y-2 mx-auto pointer-events-auto">
+            {isLocalDead && partnerHp > 0 && (
+              <div className="bg-red-950/90 border border-red-500/80 text-red-200 font-mono font-bold text-xs sm:text-sm px-5 py-2 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.5)] flex items-center gap-2 animate-pulse" id="spectator-banner">
+                <Eye className="w-4 h-4 text-red-400 animate-bounce" />
+                <span>YOU HAVE FALLEN · SPECTATING {partnerName.toUpperCase()}</span>
+              </div>
+            )}
+
             {stats.combo > 0 && (
               <div className="animate-bounce" id="combo-container">
                 <div className="text-5xl font-black font-serif text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.8)]" id="combo-count">
