@@ -49,6 +49,7 @@ export interface GameGameState {
   levelStartTime?: number | null;
   missionStartTime?: number | null;
   gameStatus: 'lobby' | 'playing' | 'gameover' | 'victory' | 'disqualified';
+  disqualifiedLevel?: number;
   lastUpdated: number;
 }
 

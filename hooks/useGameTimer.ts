@@ -63,6 +63,7 @@ export function useGameTimer(gameState: GameGameState, myRole: 'player1' | 'play
             totalTimeElapsed: nextTotal,
             l3TimeElapsed: nextL3,
             gameStatus: 'disqualified',
+            disqualifiedLevel: prev.currentLevel,
           };
         }
 

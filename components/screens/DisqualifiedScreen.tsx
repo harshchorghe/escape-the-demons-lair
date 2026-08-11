@@ -13,7 +13,7 @@ interface DisqualifiedScreenProps {
 export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state }) => {
   const router = useRouter();
 
-  const isLevel3TimeUp = state.currentLevel === 3;
+  const isLevel3TimeUp = state.disqualifiedLevel === 3 || (state.currentLevel === 3 && state.timeRemaining <= 0);
 
   useEffect(() => {
     const recordScoreOrFail = async () => {
