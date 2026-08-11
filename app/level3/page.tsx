@@ -36,6 +36,26 @@ export default function Level3Page() {
     return () => unsubscribe();
   }, [router]);
 
+  // Auto-register team on leaderboard as soon as they reach/play Level 3
+  useEffect(() => {
+    if (gameState.teamCode && gameState.currentLevel >= 3) {
+      import('@/lib/leaderboardService').then(({ saveTeamScore }) => {
+        saveTeamScore({
+          teamCode: gameState.teamCode,
+          teamName: gameState.teamName || 'Demon Slayers',
+          player1: gameState.player1Name || 'Player 1',
+          player2: gameState.player2Name || 'Player 2',
+          phoneNumber: gameState.phoneNumber || '',
+          department: gameState.department || '',
+          levelsCompleted: 3,
+          totalTimeSeconds: gameState.totalTimeElapsed || 0,
+          gameStatus: gameState.gameStatus === 'victory' ? 'victory' : 'playing',
+          date: new Date().toISOString().split('T')[0],
+        });
+      });
+    }
+  }, [gameState.teamCode, gameState.teamName, gameState.player1Name, gameState.player2Name, gameState.phoneNumber, gameState.department, gameState.currentLevel, gameState.totalTimeElapsed, gameState.gameStatus]);
+
   // Universal synchronized game timer tick
   useGameTimer(gameState, myRole);
 

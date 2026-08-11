@@ -9,7 +9,7 @@ import { DemonSlayerCharacter } from "@/components/level3/DemonSlayerCharacter";
 import { EffectsEngine } from "@/components/level3/EffectsEngine";
 import { CombatEngine, CombatStats } from "@/components/level3/CombatEngine";
 import { sound } from "@/components/level3/SoundSynthesizer";
-import { Flame, Volume2, VolumeX, HelpCircle, Eye } from "lucide-react";
+import { Flame, Volume2, VolumeX, HelpCircle, Eye, Skull } from "lucide-react";
 
 interface FinalLevelScreenProps {
   state: GameGameState;
@@ -37,6 +37,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 
   const [isMuted, setIsMuted] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isDeathModalOpen, setIsDeathModalOpen] = useState(false);
   const [announcementText, setAnnouncementText] = useState('');
   const [showAnnouncement, setShowAnnouncement] = useState(false);
 
@@ -60,6 +61,12 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
   const partnerHp = myRole === 'player1' ? p2Hp : p1Hp;
   const partnerName = myRole === 'player1' ? (state.player2Name || 'PLAYER 2') : (state.player1Name || 'PLAYER 1');
   const isLocalDead = myHp <= 0;
+
+  useEffect(() => {
+    if (isLocalDead && partnerHp > 0) {
+      setIsDeathModalOpen(true);
+    }
+  }, [isLocalDead, partnerHp]);
   const p1MaxHp = 100;
   const p2MaxHp = 100;
 
@@ -671,6 +678,33 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
               className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-black font-mono font-extrabold rounded-xl transition-colors"
             >
               Close Guide
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Single Player Death Popup Modal */}
+      {isLocalDead && partnerHp > 0 && isDeathModalOpen && (
+        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-red-600/60 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-red-950/80 border-2 border-red-600 flex items-center justify-center mx-auto text-red-500 animate-bounce">
+              <Skull className="w-8 h-8 text-red-500" />
+            </div>
+            
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono tracking-widest text-red-400 uppercase font-bold">You Have Fallen</span>
+              <h3 className="text-2xl font-serif font-extrabold text-white">YOU ARE DEAD!</h3>
+              <p className="text-xs text-zinc-300 font-mono leading-relaxed">
+                You were defeated in combat! Spectate your teammate <strong className="text-amber-400">{partnerName}</strong> as they continue the battle against the demon horde.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsDeathModalOpen(false)}
+              className="w-full py-3 bg-red-700 hover:bg-red-600 text-white font-mono font-extrabold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Eye className="w-4 h-4" />
+              SPECTATE {partnerName.toUpperCase()}
             </button>
           </div>
         </div>

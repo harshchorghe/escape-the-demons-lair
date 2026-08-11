@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import { GameGameState, gameSync } from "@/lib/gameStore";
 import { saveTeamScore } from "@/lib/leaderboardService";
-import { Skull, AlertOctagon, RotateCcw, Flame, Clock, Hourglass } from "lucide-react";
+import { Skull, AlertOctagon, RotateCcw, Flame, Clock, Hourglass, Award } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface DisqualifiedScreenProps {
@@ -14,6 +14,7 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
   const router = useRouter();
 
   const isLevel3TimeUp = state.disqualifiedLevel === 3 || (state.currentLevel === 3 && state.timeRemaining <= 0);
+  const isLevel3BothDead = state.currentLevel === 3 && !isLevel3TimeUp;
 
   useEffect(() => {
     const recordScoreOrFail = async () => {
@@ -26,7 +27,7 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
         player2: state.player2Name || 'Player 2',
         phoneNumber: state.phoneNumber || '',
         department: state.department || '',
-        levelsCompleted: isLevel3TimeUp ? 2 : (state.currentLevel > 1 ? state.currentLevel - 1 : 0),
+        levelsCompleted: state.currentLevel >= 3 ? 3 : (state.currentLevel > 1 ? state.currentLevel - 1 : 0),
         totalTimeSeconds: rankTime,
         gameStatus: 'disqualified',
         date: new Date().toISOString().split('T')[0],
@@ -73,6 +74,19 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
               The Level 3 Throne Room battle timer has expired. Your total mission time survived and stats have been saved to the leaderboard!
             </p>
           </>
+        ) : isLevel3BothDead ? (
+          <>
+            <div className="inline-flex items-center gap-2 bg-red-950 border border-red-800 px-4 py-1 rounded-full text-red-400 font-mono text-xs uppercase tracking-widest">
+              <Skull className="w-4 h-4 text-red-500" />
+              BOTH PLAYERS ELIMINATED
+            </div>
+            <h1 className="text-4xl md:text-5xl font-black text-red-600 font-serif tracking-tight drop-shadow-lg">
+              BOTH HEROES FALLEN!
+            </h1>
+            <p className="text-sm text-zinc-300 max-w-md mx-auto leading-relaxed font-mono">
+              Both Demon Slayers fell in combat. Your total mission time survived and demons slain have been recorded on the leaderboard!
+            </p>
+          </>
         ) : (
           <>
             <div className="inline-flex items-center gap-2 bg-red-950 border border-red-800 px-4 py-1 rounded-full text-red-400 font-mono text-xs uppercase tracking-widest">
@@ -89,20 +103,34 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
         )}
       </div>
 
-      {/* Team Details Panel */}
+      {/* Team Mission Summary Panel */}
       <div className="w-full bg-zinc-950/90 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4 mb-8">
-        <div className="grid grid-cols-2 gap-4 pb-4 border-b border-zinc-800 text-center sm:text-left">
-          <div>
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Team Name</span>
-            <div className="text-lg font-bold text-white truncate">{state.teamName || "Demon Slayers"}</div>
+        <h3 className="text-sm font-bold text-amber-400 font-mono flex items-center gap-2">
+          <Award className="w-4 h-4 text-amber-400" /> Team Mission Summary
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center font-mono">
+          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+            <span className="text-[10px] text-zinc-400 uppercase block">Team Code</span>
+            <span className="text-lg font-bold text-white">{state.teamCode || 'LAIR-RUN'}</span>
           </div>
-          <div className="text-right">
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Team Code</span>
-            <div className="text-lg font-mono font-bold text-amber-400">{state.teamCode}</div>
+
+          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+            <span className="text-[10px] text-zinc-400 uppercase block">Demons Slain</span>
+            <span className="text-lg font-bold text-red-500 flex items-center justify-center gap-1">
+              🔥 {state.l3DemonsDefeated || 0} / {state.l3TotalDemons || 75}
+            </span>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
+            <span className="text-[10px] text-zinc-400 uppercase block">Total Time Survived</span>
+            <span className="text-lg font-bold text-cyan-400">
+              {Math.floor((state.totalTimeElapsed || 0) / 60)}m {(state.totalTimeElapsed || 0) % 60}s
+            </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+        <div className="grid grid-cols-2 gap-3 text-xs font-mono pt-2 border-t border-zinc-900">
           <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
             <span className="text-zinc-500 block uppercase text-[10px] mb-1">Player 1</span>
             <span className="text-zinc-200 font-semibold">{state.player1Name || "Player 1"}</span>
@@ -116,19 +144,13 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
         <div className="bg-zinc-900/80 border border-zinc-800 p-4 rounded-xl space-y-2 text-xs font-mono">
           <div className="flex justify-between items-center text-zinc-300">
             <span>Status / Outcome:</span>
-            <span className={`font-bold ${isLevel3TimeUp ? 'text-amber-400' : 'text-red-400'}`}>
-              {isLevel3TimeUp ? 'Level 3 Time Expired' : 'Timer Reached 0:00'}
+            <span className={`font-bold ${isLevel3TimeUp ? 'text-amber-400' : isLevel3BothDead ? 'text-red-400' : 'text-red-500'}`}>
+              {isLevel3TimeUp ? 'Level 3 Time Expired' : isLevel3BothDead ? 'Both Heroes Fallen in Combat' : 'Timer Reached 0:00'}
             </span>
           </div>
           <div className="flex justify-between items-center text-zinc-400">
             <span>Reached Level:</span>
-            <span className="font-bold text-white">Level 3: Throne Room</span>
-          </div>
-          <div className="flex items-center justify-between bg-zinc-950 border border-zinc-800 p-3 rounded-lg">
-            <span className="text-zinc-400">Total Mission Time Recorded:</span>
-            <span className="font-bold text-cyan-400">
-              {Math.floor((state.totalTimeElapsed || 0) / 60)}m {(state.totalTimeElapsed || 0) % 60}s
-            </span>
+            <span className="font-bold text-white">Level {state.currentLevel}: {state.currentLevel === 3 ? "Throne Room" : state.currentLevel === 2 ? "Demon Doors" : "Haunted Rooms"}</span>
           </div>
         </div>
       </div>
@@ -143,7 +165,7 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
         }`}
       >
         <RotateCcw className="w-5 h-5" />
-        RETURN TO LOBBY & RESTART MISSION
+        START NEW MISSION
       </button>
     </div>
   );
