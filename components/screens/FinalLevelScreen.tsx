@@ -355,26 +355,6 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
         }
       }
 
-      // Periodic Firestore sync (~1s) so remote cross-device players stay synchronized
-      if (frameCounter % 60 === 0) {
-        const charPos = character.group.position;
-        const charRot = character.group.rotation.y;
-        const localPosData = {
-          x: charPos.x,
-          z: charPos.z,
-          rot: charRot,
-          state: isLocalAlive ? character.state : 'die',
-          alive: isLocalAlive,
-          hp: Math.max(0, combat.playerHp),
-        };
-
-        if (myRole === 'player1') {
-          gameSync.updateState({ p1Pos: localPosData });
-        } else {
-          gameSync.updateState({ p2Pos: localPosData });
-        }
-      }
-
       // Smoothly update remote partner position & animation
       const partnerPosData = myRole === 'player1' ? stateRef.current.p2Pos : stateRef.current.p1Pos;
       if (partnerPosData && partnerCharacter) {

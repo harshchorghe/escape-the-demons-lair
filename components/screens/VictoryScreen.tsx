@@ -79,7 +79,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
           <Award className="w-5 h-5" /> Team Escaped Mission Summary
         </h3>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
           <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
             <span className="text-xs font-mono text-zinc-400 uppercase block">Team Code</span>
             <span className="text-lg font-mono font-bold text-white">{state.teamCode || 'LAIR-DEMO'}</span>
@@ -88,7 +88,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
           <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
             <span className="text-xs font-mono text-zinc-400 uppercase block">Demons Slain</span>
             <span className="text-lg font-mono font-bold text-red-500 flex items-center justify-center gap-1">
-              🔥 50 / 50
+              🔥 {state.l3DemonsDefeated || 75} / {state.l3TotalDemons || 75}
             </span>
           </div>
 
@@ -96,13 +96,6 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ state }) => {
             <span className="text-xs font-mono text-zinc-400 uppercase block">Total Time</span>
             <span className="text-lg font-mono font-bold text-cyan-400">
               {formatSeconds(state.totalTimeElapsed || 0)}
-            </span>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-            <span className="text-xs font-mono text-zinc-400 uppercase block">Level 3 Time</span>
-            <span className="text-lg font-mono font-bold text-emerald-400">
-              {formatSeconds(state.l3TimeElapsed || 0)}
             </span>
           </div>
         </div>
