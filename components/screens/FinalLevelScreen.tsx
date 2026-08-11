@@ -420,12 +420,13 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
       effects.update(deltaTime);
       combat.update(deltaTime);
 
-      // Check Team Disqualification condition
-      const isPartnerAliveChecked = partnerPosData
-        ? (partnerPosData.alive !== false && partnerPosData.state !== 'die' && (typeof partnerPosData.hp === 'number' ? partnerPosData.hp > 0 : true))
-        : true;
+      // Check Team Disqualification condition:
+      // ONLY end the match when BOTH players are explicitly dead!
+      const isPartnerExplicitlyDead = Boolean(
+        partnerPosData && (partnerPosData.alive === false || partnerPosData.state === 'die' || (typeof partnerPosData.hp === 'number' && partnerPosData.hp <= 0))
+      );
 
-      if (!isLocalAlive && !isPartnerAliveChecked) {
+      if (!isLocalAlive && isPartnerExplicitlyDead) {
         if (stateRef.current.gameStatus === 'playing' && stateRef.current.currentLevel === 3 && !stateRef.current.isDemonSealed) {
           gameSync.updateState({ gameStatus: 'disqualified' });
         }
@@ -446,7 +447,7 @@ export const FinalLevelScreen: React.FC<FinalLevelScreenProps> = ({ state, myRol
 
       // Spectator Mode Camera Tracking:
       // When local player is dead, track and follow the active surviving teammate!
-      if (!isLocalAlive && isPartnerAliveChecked && partnerCharacter) {
+      if (!isLocalAlive && !isPartnerExplicitlyDead && partnerCharacter) {
         const partnerPos = partnerCharacter.group.position;
         controls.target.lerp(new THREE.Vector3(partnerPos.x, partnerPos.y + 1.2, partnerPos.z), 0.1);
       } else {
