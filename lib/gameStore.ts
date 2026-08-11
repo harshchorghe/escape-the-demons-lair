@@ -48,6 +48,7 @@ export interface GameGameState {
   level3Duration: number;
   levelStartTime?: number | null;
   missionStartTime?: number | null;
+  l2IsStarted?: boolean;
   gameStatus: 'lobby' | 'playing' | 'gameover' | 'victory' | 'disqualified';
   disqualifiedLevel?: number;
   lastUpdated: number;
@@ -67,6 +68,7 @@ export const INITIAL_GAME_STATE: GameGameState = {
   l1FailedRooms: [],
   l1IsCompleted: false,
   l2UnlockedDoors: [],
+  l2IsStarted: false,
   l2Score: 0,
   l3DestroyedCrystals: [],
   collectedSealFragments: 0,

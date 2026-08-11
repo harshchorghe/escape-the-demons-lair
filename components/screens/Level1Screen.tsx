@@ -83,8 +83,9 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
         l1CompletedRooms: updatedCompleted,
         l1IsCompleted: true,
         currentLevel: 2,
+        l2IsStarted: false,
         timeRemaining: l2Sec,
-        levelStartTime: now,
+        levelStartTime: null,
         timePenalties: 0,
       });
     }

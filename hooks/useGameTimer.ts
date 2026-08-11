@@ -55,6 +55,13 @@ export function useGameTimer(gameState: GameGameState, myRole: 'player1' | 'play
           nextTotal = elapsedMissionSec;
         }
 
+        // For Level 2, hold the timer at full duration until actual bird flight starts (l2IsStarted === true)
+        if (prev.currentLevel === 2 && !prev.l2IsStarted) {
+          return {
+            timeRemaining: prev.level2Duration || 120,
+          };
+        }
+
         const nextL3 = prev.currentLevel === 3 ? (prev.l3TimeElapsed || 0) + 1 : (prev.l3TimeElapsed || 0);
 
         if (nextTime <= 0) {

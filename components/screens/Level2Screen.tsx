@@ -415,13 +415,23 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
       // Countdown finished — start the game!
       setCountdown(null);
       setIsPlaying(true);
+      const now = Date.now();
+      const l2Sec = state.level2Duration || 120;
+      gameSync.updateState({
+        l2IsStarted: true,
+        levelStartTime: now,
+        timeRemaining: l2Sec,
+      });
+      if (state.teamCode) {
+        pythonApi.startRoomTimer(state.teamCode, 2);
+      }
       return;
     }
     const timer = setTimeout(() => {
       setCountdown(prev => (prev !== null ? prev - 1 : null));
     }, 1000);
     return () => clearTimeout(timer);
-  }, [countdown]);
+  }, [countdown, state.level2Duration, state.teamCode]);
 
   const startGame = () => {
     // Reset variables
@@ -437,6 +447,17 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
     setIsPlaying(true);
     setIsGameOver(false);
     setFeedback({ message: '' });
+
+    const now = Date.now();
+    const l2Sec = state.level2Duration || 120;
+    gameSync.updateState({
+      l2IsStarted: true,
+      levelStartTime: now,
+      timeRemaining: l2Sec,
+    });
+    if (state.teamCode) {
+      pythonApi.startRoomTimer(state.teamCode, 2);
+    }
   };
 
   // Keyboard controls listener (uses ref to always call latest triggerJump)
