@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getAllTeamsLeaderboard, LeaderboardEntry } from "@/lib/leaderboardService";
+import { getAllTeamsLeaderboard, subscribeToLeaderboard, LeaderboardEntry } from "@/lib/leaderboardService";
 import { Shield, RefreshCw, CheckCircle2, Trophy, Clock, XCircle, Lock, KeyRound, Eye, EyeOff, LogOut } from "lucide-react";
 import Link from "next/link";
 
@@ -34,6 +34,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAuthenticated) {
       loadLeaderboard();
+      const unsubscribe = subscribeToLeaderboard((data) => {
+        setLeaderboard(data);
+      });
+      return () => unsubscribe();
     }
   }, [isAuthenticated]);
 

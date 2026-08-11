@@ -1,5 +1,5 @@
 import { db, isFirebaseInitialized } from "./firebase";
-import { collection, doc, setDoc, getDocs } from "firebase/firestore";
+import { collection, doc, setDoc, getDocs, onSnapshot } from "firebase/firestore";
 
 export interface LeaderboardEntry {
   id: string;
@@ -102,4 +102,25 @@ export async function getAllTeamsLeaderboard(maxLimit: number = 25): Promise<Lea
   // Rank entries: 3/3 levels first (by fastest time), then 2/3, 1/3, 0/3
   const ranked = sortLeaderboardEntries(entries);
   return ranked.slice(0, maxLimit);
+}
+
+/**
+ * Real-time listener for the leaderboard in Firestore.
+ */
+export function subscribeToLeaderboard(callback: (entries: LeaderboardEntry[]) => void): () => void {
+  if (isFirebaseInitialized && db) {
+    try {
+      const leaderCollection = collection(db, 'leaderboard');
+      return onSnapshot(leaderCollection, (snapshot) => {
+        const entries = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as LeaderboardEntry[];
+        callback(sortLeaderboardEntries(entries));
+      });
+    } catch (e) {
+      console.warn("Firestore leaderboard subscription warning:", e);
+    }
+  }
+  return () => {};
 }

@@ -36,9 +36,11 @@ export default function Level3Page() {
     return () => unsubscribe();
   }, [router]);
 
-  // Auto-register team on leaderboard as soon as they reach/play Level 3
+  // Auto-register team on leaderboard ONCE as soon as they reach Level 3
+  const hasLoggedLevel3Ref = React.useRef(false);
   useEffect(() => {
-    if (gameState.teamCode && gameState.currentLevel >= 3) {
+    if (gameState.teamCode && gameState.currentLevel >= 3 && !hasLoggedLevel3Ref.current) {
+      hasLoggedLevel3Ref.current = true;
       import('@/lib/leaderboardService').then(({ saveTeamScore }) => {
         saveTeamScore({
           teamCode: gameState.teamCode,
@@ -54,7 +56,7 @@ export default function Level3Page() {
         });
       });
     }
-  }, [gameState.teamCode, gameState.teamName, gameState.player1Name, gameState.player2Name, gameState.phoneNumber, gameState.department, gameState.currentLevel, gameState.totalTimeElapsed, gameState.gameStatus]);
+  }, [gameState.teamCode, gameState.currentLevel]);
 
   // Universal synchronized game timer tick
   useGameTimer(gameState, myRole);
