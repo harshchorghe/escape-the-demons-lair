@@ -9,7 +9,7 @@ export interface VideoConfig {
 }
 
 const DEFAULT_VIDEOS: Required<VideoConfig> = {
-  lobby: process.env.NEXT_PUBLIC_VIDEO_LOBBY || "/videos/level.mp4",
+  lobby: process.env.NEXT_PUBLIC_VIDEO_LOBBY || "/videos/login.mp4",
   level_1: process.env.NEXT_PUBLIC_VIDEO_LEVEL_1 || "/videos/level_1.mp4",
   level_2: process.env.NEXT_PUBLIC_VIDEO_LEVEL_2 || "/videos/level_2.mp4",
   level_3: process.env.NEXT_PUBLIC_VIDEO_LEVEL_3 || "/videos/level_3.mp4",

@@ -21,7 +21,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   setMyRole,
   onStartMission,
 }) => {
-  const lobbyVideoSrc = useVideoSrc('lobby', '/videos/level.mp4');
+  const lobbyVideoSrc = useVideoSrc('lobby', '/videos/login.mp4');
 
   const [player1Input, setPlayer1Input] = useState(state.player1Name || '');
   const [teamNameInput, setTeamNameInput] = useState(state.teamName || '');
@@ -452,8 +452,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                     <button
                       onClick={handleToggleReady}
                       className={`w-full sm:flex-1 py-3 rounded-xl font-mono text-sm font-bold border transition-all ${(myRole === 'player1' && state.isPlayer1Ready) || (myRole === 'player2' && state.isPlayer2Ready)
-                          ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
-                          : 'bg-emerald-700 border-emerald-600 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-950/50'
+                        ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                        : 'bg-emerald-700 border-emerald-600 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-950/50'
                         }`}
                     >
                       {(myRole === 'player1' && state.isPlayer1Ready) || (myRole === 'player2' && state.isPlayer2Ready)
@@ -466,8 +466,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                         onClick={handleStartMission}
                         disabled={!state.isPlayer1Ready || !state.isPlayer2Ready}
                         className={`w-full sm:flex-1 py-3 rounded-xl font-mono text-sm font-bold flex items-center justify-center gap-2 transition-all ${state.isPlayer1Ready && state.isPlayer2Ready
-                            ? 'bg-red-700 hover:bg-red-600 text-white shadow-lg shadow-red-950/50 cursor-pointer'
-                            : 'bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed'
+                          ? 'bg-red-700 hover:bg-red-600 text-white shadow-lg shadow-red-950/50 cursor-pointer'
+                          : 'bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed'
                           }`}
                       >
                         <Play className="w-4 h-4 fill-current" /> Begin Escape Mission
