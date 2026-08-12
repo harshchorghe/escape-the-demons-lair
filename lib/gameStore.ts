@@ -189,11 +189,24 @@ class GameSyncManager {
           if (data.lastUpdated && this.currentState.lastUpdated && data.lastUpdated < this.currentState.lastUpdated) {
             return;
           }
+
+          const mergedP1Pos = data.p1Pos ? {
+            ...(this.currentState.p1Pos || {}),
+            ...data.p1Pos,
+          } : this.currentState.p1Pos;
+
+          const mergedP2Pos = data.p2Pos ? {
+            ...(this.currentState.p2Pos || {}),
+            ...data.p2Pos,
+          } : this.currentState.p2Pos;
+
           // Merge safely so array fields are never reset or set to undefined
           this.currentState = {
             ...INITIAL_GAME_STATE,
             ...this.currentState,
             ...data,
+            p1Pos: mergedP1Pos,
+            p2Pos: mergedP2Pos,
             l3DemonsDefeated: Math.max(
               this.currentState.l3DemonsDefeated || 0,
               data.l3DemonsDefeated || 0
@@ -304,7 +317,6 @@ class GameSyncManager {
     const newState: GameGameState = {
       ...this.currentState,
       ...partialUpdate,
-      lastUpdated: Date.now(),
     };
 
     this.currentState = newState;
