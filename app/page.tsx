@@ -53,7 +53,7 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-red-900 selection:text-white font-sans overflow-hidden">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-red-900 selection:text-white font-sans">
       {/* Header HUD Bar */}
       <HeaderHUD
         teamCode={gameState.teamCode}
@@ -65,7 +65,7 @@ export default function Home() {
       />
 
       {/* Main Content Area - only lobby shown here; levels have dedicated routes */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-y-auto">
         {/* Lobby Screen */}
         {gameState.gameStatus === 'lobby' && (
           <LobbyScreen
@@ -102,16 +102,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-zinc-900 bg-zinc-950 px-4 py-3 text-center text-xs font-mono text-zinc-600">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Escape the Demon's Lair • Next.js + Three.js + Firebase + Python Backend</span>
-          <span className="flex items-center gap-1 text-zinc-500">
-            <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
-            Co-op Mission Rule Engine Active
-          </span>
-        </div>
-      </footer>
+      {/* Python Config Modal */}
 
       {/* Python Config Modal */}
       <PythonConfigModal

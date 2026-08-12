@@ -179,47 +179,48 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="relative min-h-full py-2 sm:py-4">
       <BackgroundVideo src={lobbyVideoSrc} />
       <div className="absolute inset-0 bg-black/55 z-10" />
       <div className="relative z-20">
-        <section className="w-full px-4 pt-3 pb-1">
+        <section className="w-full px-4 pt-1 pb-2">
           <div className="max-w-5xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-red-950/60 border border-red-800/60 px-4 py-1.5 rounded-full text-red-400 font-mono text-xs uppercase tracking-widest mb-3">
-              <ShieldAlert className="w-4 h-4 text-red-500 animate-pulse" />
+            <div className="inline-flex items-center gap-1.5 bg-red-950/60 border border-red-800/60 px-3 py-1 rounded-full text-red-400 font-mono text-xs uppercase tracking-widest mb-2">
+              <ShieldAlert className="w-3.5 h-3.5 text-red-500 animate-pulse" />
               Cooperative 2-Player Mission
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-2 font-serif drop-shadow-md">
-              Escape the Demon's Lair
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-1 font-serif drop-shadow-md">
+              Demon Slayers: Escape the Lair
             </h1>
-            <p className="text-sm text-zinc-400 max-w-3xl mx-auto mb-4">
-              Form a 2-player team, solve haunted rooms, decode demon door ciphers, and unite in the Throne Room to seal the Demon Lord.
+            <p className="text-xs sm:text-sm text-zinc-400 max-w-3xl mx-auto mb-3">
+              Form a 2-player team: Player 1 solves gravity vaults, Player 2 survives 18 demonic pillars, and both unite in the Throne Room to slay 75 demons!
             </p>
           </div>
         </section>
 
-        <section className="flex-1 w-full max-w-[1400px] mx-auto px-4 overflow-hidden">
-          <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] items-center gap-6 lg:gap-10 ">
+        <section className="flex-1 w-full max-w-[1400px] mx-auto px-4">
+          <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] items-start gap-6 lg:gap-8">
             <div className="w-full flex flex-col items-center">
               {!state.teamCode ? (
-                <div className="relative z-10 w-full grid grid-cols-1 md:grid-cols-2 gap-6 lg:pr-2">
-                  <div className="bg-zinc-950/90 border border-red-900/50 rounded-2xl p-6 shadow-2xl flex flex-col justify-between hover:border-red-600/60 transition-all">
+                <div className="relative z-10 w-full grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6 items-stretch">
+                  {/* Create New Team Card */}
+                  <div className="bg-zinc-950/90 border border-red-900/60 rounded-2xl p-5 shadow-2xl flex flex-col justify-between hover:border-red-600/60 transition-all h-full">
                     <div>
-                      <div className="w-12 h-12 rounded-xl bg-red-950/80 border border-red-700/50 flex items-center justify-center text-red-400 mb-4">
-                        <Users className="w-6 h-6" />
+                      <div className="w-10 h-10 rounded-xl bg-red-950/80 border border-red-700/50 flex items-center justify-center text-red-400 mb-3">
+                        <Users className="w-5 h-5" />
                       </div>
-                      <h3 className="text-xl font-bold text-white mb-2">Create New Team</h3>
-                      <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
+                      <h3 className="text-lg font-bold text-white mb-1">Create New Team</h3>
+                      <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
                         Enter your details and Team Name to generate a unique Team Code for Player 2.
                       </p>
 
                       {errorMsg && (
-                        <div className="mb-4 p-2.5 bg-red-950/80 border border-red-600/50 rounded-lg text-xs font-mono text-red-300 text-center">
+                        <div className="mb-3 p-2 bg-red-950/80 border border-red-600/50 rounded-lg text-xs font-mono text-red-300 text-center">
                           {errorMsg}
                         </div>
                       )}
 
-                      <div className="space-y-4 mb-4">
+                      <div className="space-y-3 mb-4">
                         <div>
                           <label className="block text-xs font-mono text-zinc-300 uppercase mb-1">
                             Player 1 Name
@@ -229,7 +230,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                             value={player1Input}
                             onChange={(e) => setPlayer1Input(e.target.value)}
                             placeholder="e.g. Shadow Navigator"
-                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg outline-none"
+                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2 rounded-lg outline-none"
                           />
                         </div>
                         <div>
@@ -241,7 +242,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                             value={teamNameInput}
                             onChange={(e) => setTeamNameInput(e.target.value)}
                             placeholder="e.g. Demon Slayers"
-                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg outline-none"
+                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2 rounded-lg outline-none"
                           />
                         </div>
                         <div>
@@ -253,7 +254,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                             value={phoneInput}
                             onChange={(e) => setPhoneInput(e.target.value)}
                             placeholder="e.g. +91 9876543210"
-                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg outline-none"
+                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2 rounded-lg outline-none"
                           />
                         </div>
                         <div>
@@ -265,7 +266,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                             value={deptInput}
                             onChange={(e) => setDeptInput(e.target.value)}
                             placeholder="e.g. Computer Science / IT"
-                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg outline-none"
+                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-red-500 text-zinc-100 font-mono text-sm px-3 py-2 rounded-lg outline-none"
                           />
                         </div>
                       </div>
@@ -273,24 +274,25 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
                     <button
                       onClick={handleCreateTeam}
-                      className="w-full bg-red-700 hover:bg-red-600 text-white font-mono text-sm py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-950/50 flex items-center justify-center gap-2 mt-4"
+                      className="w-full bg-red-700 hover:bg-red-600 text-white font-mono text-sm py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-red-950/50 flex items-center justify-center gap-2 mt-2 cursor-pointer"
                     >
                       <Key className="w-4 h-4" /> Create Team & Generate Code
                     </button>
                   </div>
 
-                  <div className="bg-zinc-950/90 border border-purple-900/50 rounded-2xl p-6 shadow-2xl flex flex-col justify-between hover:border-purple-600/60 transition-all">
+                  {/* Join Existing Team Card */}
+                  <div className="bg-zinc-950/90 border border-purple-900/60 rounded-2xl p-5 shadow-2xl flex flex-col justify-between hover:border-purple-600/60 transition-all h-full">
                     <div>
-                      <div className="w-12 h-12 rounded-xl bg-purple-950/80 border border-purple-700/50 flex items-center justify-center text-purple-400 mb-4">
-                        <Key className="w-6 h-6" />
+                      <div className="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-700/50 flex items-center justify-center text-purple-400 mb-3">
+                        <Key className="w-5 h-5" />
                       </div>
-                      <h3 className="text-xl font-bold text-white mb-2">Join Existing Team</h3>
-                      <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
+                      <h3 className="text-lg font-bold text-white mb-1">Join Existing Team</h3>
+                      <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
                         Enter your partner's Team Code to locate their room and join as Player 2.
                       </p>
 
                       {errorMsg && (
-                        <div className="mb-4 p-2.5 bg-red-950/80 border border-red-600/50 rounded-lg text-xs font-mono text-red-300 text-center">
+                        <div className="mb-3 p-2 bg-red-950/80 border border-red-600/50 rounded-lg text-xs font-mono text-red-300 text-center">
                           {errorMsg}
                         </div>
                       )}
@@ -306,22 +308,43 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                               value={inputCode}
                               onChange={(e) => setInputCode(e.target.value)}
                               placeholder="e.g. LAIR-7X9B"
-                              className="w-full bg-zinc-900 border border-zinc-800 focus:border-purple-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg uppercase tracking-wider outline-none"
+                              className="w-full bg-zinc-900 border border-zinc-800 focus:border-purple-500 text-zinc-100 font-mono text-sm px-3 py-2 rounded-lg uppercase tracking-wider outline-none"
                             />
                           </div>
                           <button
                             onClick={handleVerifyCodeStep1}
                             disabled={isSearching}
-                            className="w-full bg-purple-700 hover:bg-purple-600 text-white font-mono text-sm py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-950/50 flex items-center justify-center gap-2 mt-4"
+                            className="w-full bg-purple-700 hover:bg-purple-600 text-white font-mono text-sm py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-purple-950/50 flex items-center justify-center gap-2 mt-2 cursor-pointer"
                           >
                             {isSearching ? "Locating Team..." : <>Find Team <ArrowRight className="w-4 h-4" /></>}
                           </button>
+
+                          {/* How Co-op Works Guide inside Join Card */}
+                          <div className="mt-5 pt-4 border-t border-purple-900/40">
+                            <span className="text-[11px] font-mono text-purple-400 uppercase tracking-widest block mb-2.5 font-bold flex items-center gap-1.5">
+                              <ShieldAlert className="w-3.5 h-3.5 text-purple-400" /> How Co-op Works
+                            </span>
+                            <div className="space-y-2">
+                              <div className="flex items-start gap-2.5 bg-purple-950/30 p-2.5 rounded-xl border border-purple-900/30">
+                                <span className="w-5 h-5 rounded-full bg-purple-900/80 text-purple-300 font-mono text-xs flex items-center justify-center font-bold shrink-0">1</span>
+                                <p className="text-xs text-zinc-300 leading-tight">Player 1 creates team and shares the secret code.</p>
+                              </div>
+                              <div className="flex items-start gap-2.5 bg-purple-950/30 p-2.5 rounded-xl border border-purple-900/30">
+                                <span className="w-5 h-5 rounded-full bg-purple-900/80 text-purple-300 font-mono text-xs flex items-center justify-center font-bold shrink-0">2</span>
+                                <p className="text-xs text-zinc-300 leading-tight">Player 2 enters code to connect their session.</p>
+                              </div>
+                              <div className="flex items-start gap-2.5 bg-purple-950/30 p-2.5 rounded-xl border border-purple-900/30">
+                                <span className="w-5 h-5 rounded-full bg-purple-900/80 text-purple-300 font-mono text-xs flex items-center justify-center font-bold shrink-0">3</span>
+                                <p className="text-xs text-zinc-300 leading-tight">Both mark READY to launch the escape mission!</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-4 mb-4">
                           <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl">
                             <span className="text-[10px] font-mono text-purple-400 uppercase tracking-widest block">Team Located</span>
-                            <div className="text-lg font-bold text-white flex items-center gap-2">
+                            <div className="text-base font-bold text-white flex items-center gap-2">
                               <ShieldCheck className="w-5 h-5 text-purple-400" />
                               {foundRoom?.teamName || "Demon Slayers"}
                             </div>
@@ -339,20 +362,20 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                               value={player2Input}
                               onChange={(e) => setPlayer2Input(e.target.value)}
                               placeholder="e.g. Cipher Decrypter"
-                              className="w-full bg-zinc-900 border border-zinc-800 focus:border-purple-500 text-zinc-100 font-mono text-sm px-3 py-2.5 rounded-lg outline-none"
+                              className="w-full bg-zinc-900 border border-zinc-800 focus:border-purple-500 text-zinc-100 font-mono text-sm px-3 py-2 rounded-lg outline-none"
                             />
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 pt-2">
                             <button
                               onClick={() => setJoinStep(1)}
-                              className="w-1/3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs py-3 rounded-xl font-bold transition-all"
+                              className="w-1/3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs py-2.5 rounded-xl font-bold transition-all cursor-pointer"
                             >
                               Back
                             </button>
                             <button
                               onClick={handleJoinTeamStep2}
-                              className="w-2/3 bg-purple-700 hover:bg-purple-600 text-white font-mono text-sm py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-950/50 flex items-center justify-center gap-2"
+                              className="w-2/3 bg-purple-700 hover:bg-purple-600 text-white font-mono text-sm py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-purple-950/50 flex items-center justify-center gap-2 cursor-pointer"
                             >
                               <CheckCircle2 className="w-4 h-4" /> Join & Mark Ready
                             </button>
@@ -456,7 +479,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             </div>
 
             <div className="w-full flex items-center justify-center lg:justify-end">
-              <div className="relative h-[540px] w-full max-w-[480px] overflow-hidden">
+              <div className="relative h-[460px] sm:h-[500px] lg:h-[520px] w-full max-w-[480px] overflow-hidden">
                 <LobbyBackground />
               </div>
             </div>

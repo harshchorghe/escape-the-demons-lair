@@ -54,7 +54,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
           <div className="flex items-center gap-2 bg-red-950/60 border border-red-800/60 px-3 py-1.5 rounded-lg">
             <Shield className="w-4 h-4 text-red-500 animate-pulse" />
             <span className="font-mono font-bold text-sm tracking-wider text-red-400">
-              {teamCode ? `TEAM: ${teamCode}` : "ESCAPE DEMON'S LAIR"}
+              {teamCode ? `TEAM: ${teamCode}` : "DEMON SLAYERS: ESCAPE THE LAIR"}
             </span>
           </div>
 
@@ -99,21 +99,6 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
               </div>
             </div>
           )}
-
-          {/* Python Config Badge */}
-          <button
-            onClick={onOpenPythonConfig}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-all ${
-              pythonStatus === 'online'
-                ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60'
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
-            }`}
-            title="Configure Python Backend API"
-          >
-            <Server className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Python API:</span>
-            <span className={`w-2 h-2 rounded-full ${pythonStatus === 'online' ? 'bg-emerald-400' : 'bg-amber-500'}`} />
-          </button>
         </div>
       </div>
     </header>
