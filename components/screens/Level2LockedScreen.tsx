@@ -29,15 +29,15 @@ export const Level2LockedScreen: React.FC<Level2LockedScreenProps> = ({ state })
       <div className="text-center mb-6">
         <div className="inline-flex items-center gap-2 bg-purple-950/60 border border-purple-800/60 px-4 py-1.5 rounded-full text-purple-400 font-mono text-xs uppercase tracking-widest mb-3">
           <Lock className="w-3.5 h-3.5" />
-          Level 2 — Demon Doors
+          Level 2 — Demonic Cavern
         </div>
         <h2 className="text-3xl font-extrabold text-white font-serif mb-2">
           Awaiting Player 1...
         </h2>
         <p className="text-sm text-zinc-400 max-w-sm mx-auto leading-relaxed">
-          The Demon Doors are sealed until{" "}
+          The Demonic Cavern is sealed until{" "}
           <span className="text-red-400 font-semibold">{state.player1Name || "Player 1"}</span>{" "}
-          clears 2 Haunted Rooms in Level 1.
+          clears the Gravity Vaults in Level 1.
         </p>
       </div>
 

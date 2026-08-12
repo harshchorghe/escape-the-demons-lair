@@ -40,10 +40,10 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   };
 
   const levelTitles = {
-    1: "Level 1: Haunted Rooms",
-    2: "Level 2: Demon Doors",
-    3: "Final Level: Throne Room",
-    4: "Escaped Demon's Lair",
+    1: "Level 1: Gravity Vaults",
+    2: "Level 2: Demonic Cavern",
+    3: "Level 3: Throne Room Combat",
+    4: "Lair Escaped! Victory",
   };
 
   return (
@@ -61,7 +61,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
           <div className="hidden sm:flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg text-xs font-mono">
             <Users className="w-3.5 h-3.5 text-zinc-400" />
             <span className="text-zinc-300">
-              Role: <strong className="text-amber-400">{myRole === 'player1' ? 'Player 1 (Navigator)' : 'Player 2 (Decrypter)'}</strong>
+              Role: <strong className="text-amber-400">{myRole === 'player1' ? 'Player 1 (Gravity Lead)' : 'Player 2 (Demonic Pillars Lead)'}</strong>
             </span>
           </div>
         </div>

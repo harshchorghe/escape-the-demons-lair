@@ -410,7 +410,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                     <div className={`p-4 rounded-xl border ${state.isPlayer1Ready ? 'bg-emerald-950/30 border-emerald-500/50' : 'bg-zinc-900 border-zinc-800'
                       }`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-mono text-red-400 font-bold uppercase">Player 1 (Level 1 Lead)</span>
+                        <span className="text-xs font-mono text-red-400 font-bold uppercase">Player 1 (Gravity Vaults Lead)</span>
                         {state.isPlayer1Ready ? (
                           <span className="text-xs font-mono text-emerald-400 flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5" /> READY
@@ -427,7 +427,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                     <div className={`p-4 rounded-xl border ${state.isPlayer2Ready ? 'bg-emerald-950/30 border-emerald-500/50' : 'bg-zinc-900 border-zinc-800'
                       }`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-mono text-purple-400 font-bold uppercase">Player 2 (Level 2 Lead)</span>
+                        <span className="text-xs font-mono text-purple-400 font-bold uppercase">Player 2 (Demonic Pillars Lead)</span>
                         {state.isPlayer2Ready ? (
                           <span className="text-xs font-mono text-emerald-400 flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5" /> READY

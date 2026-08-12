@@ -150,7 +150,7 @@ export const DisqualifiedScreen: React.FC<DisqualifiedScreenProps> = ({ state })
           </div>
           <div className="flex justify-between items-center text-zinc-400">
             <span>Reached Level:</span>
-            <span className="font-bold text-white">Level {state.currentLevel}: {state.currentLevel === 3 ? "Throne Room" : state.currentLevel === 2 ? "Demon Doors" : "Haunted Rooms"}</span>
+            <span className="font-bold text-white">Level {state.currentLevel}: {state.currentLevel === 3 ? "Throne Room Combat" : state.currentLevel === 2 ? "Demonic Cavern" : "Gravity Vaults"}</span>
           </div>
         </div>
       </div>
