@@ -66,56 +66,61 @@ export default function Level1Page() {
         onOpenPythonConfig={() => setIsPythonConfigOpen(true)}
       />
 
-      <main className="flex-1 flex flex-col items-center justify-center p-4">
-        {/* Active Level 1 Screen */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Active Level 1 Screen — fills full viewport width as 70/30 layout */}
         {gameState.gameStatus === 'playing' && gameState.currentLevel === 1 && (
           <Level1Screen state={gameState} myRole={myRole} />
         )}
 
-        {/* Level 1 Completed — Awaiting Player 2 on Level 2 */}
-        {gameState.gameStatus === 'playing' && gameState.currentLevel === 2 && (
-          <div className="w-full max-w-md text-center space-y-6 bg-zinc-950/90 border border-emerald-900/60 rounded-2xl p-8 shadow-2xl">
-            <div className="relative w-20 h-20 mx-auto">
-              <div className="w-20 h-20 rounded-full bg-emerald-950/80 border-2 border-emerald-600/60 flex items-center justify-center">
-                <Skull className="w-9 h-9 text-emerald-400" />
+        {/* All other states — centered in available space */}
+        {!(gameState.gameStatus === 'playing' && gameState.currentLevel === 1) && (
+          <div className="flex-1 flex items-center justify-center p-4">
+            {/* Level 1 Completed — Awaiting Player 2 on Level 2 */}
+            {gameState.gameStatus === 'playing' && gameState.currentLevel === 2 && (
+              <div className="w-full max-w-md text-center space-y-6 bg-zinc-950/90 border border-emerald-900/60 rounded-2xl p-8 shadow-2xl">
+                <div className="relative w-20 h-20 mx-auto">
+                  <div className="w-20 h-20 rounded-full bg-emerald-950/80 border-2 border-emerald-600/60 flex items-center justify-center">
+                    <Skull className="w-9 h-9 text-emerald-400" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
+                    <span className="text-black text-xs font-extrabold">✓</span>
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-extrabold text-emerald-400 font-serif">Level 1 Cleared!</h2>
+                  <p className="text-sm text-zinc-400 mt-2">
+                    The Haunted Chambers have been conquered!
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-800/40 rounded-xl text-xs text-emerald-300 font-mono">
+                    ✅ Player 1 mission complete — {gameState.l1CompletedRooms.length}/2 rooms cleared
+                  </div>
+                  <div className="p-3 bg-purple-950/40 border border-purple-800/40 rounded-xl text-xs text-purple-300 font-mono animate-pulse">
+                    ⏳ Waiting for Player 2 to navigate the Demon Doors...
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 font-mono">
+                  The final level unlocks when Player 2 escapes Level 2.
+                </p>
               </div>
-              <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                <span className="text-black text-xs font-extrabold">✓</span>
-              </div>
-            </div>
-            <div>
-              <h2 className="text-3xl font-extrabold text-emerald-400 font-serif">Level 1 Cleared!</h2>
-              <p className="text-sm text-zinc-400 mt-2">
-                The Haunted Chambers have been conquered!
-              </p>
-            </div>
-            <div className="space-y-2">
-              <div className="p-3 bg-emerald-950/40 border border-emerald-800/40 rounded-xl text-xs text-emerald-300 font-mono">
-                ✅ Player 1 mission complete — {gameState.l1CompletedRooms.length}/2 rooms cleared
-              </div>
-              <div className="p-3 bg-purple-950/40 border border-purple-800/40 rounded-xl text-xs text-purple-300 font-mono animate-pulse">
-                ⏳ Waiting for Player 2 to navigate the Demon Doors...
-              </div>
-            </div>
-            <p className="text-xs text-zinc-500 font-mono">
-              The final level unlocks when Player 2 escapes Level 2.
-            </p>
+            )}
+
+            {/* Level 3: Final Throne Room */}
+            {gameState.gameStatus === 'playing' && gameState.currentLevel === 3 && (
+              <FinalLevelScreen state={gameState} myRole={myRole} />
+            )}
+
+            {/* Victory Screen */}
+            {(gameState.gameStatus === 'victory' || gameState.currentLevel === 4) && (
+              <VictoryScreen state={gameState} />
+            )}
+
+            {/* Automatic Disqualification / Game Over Screen */}
+            {(gameState.gameStatus === 'disqualified' || gameState.gameStatus === 'gameover') && (
+              <DisqualifiedScreen state={gameState} />
+            )}
           </div>
-        )}
-
-        {/* Level 3: Final Throne Room */}
-        {gameState.gameStatus === 'playing' && gameState.currentLevel === 3 && (
-          <FinalLevelScreen state={gameState} myRole={myRole} />
-        )}
-
-        {/* Victory Screen */}
-        {(gameState.gameStatus === 'victory' || gameState.currentLevel === 4) && (
-          <VictoryScreen state={gameState} />
-        )}
-
-        {/* Automatic Disqualification / Game Over Screen */}
-        {(gameState.gameStatus === 'disqualified' || gameState.gameStatus === 'gameover') && (
-          <DisqualifiedScreen state={gameState} />
         )}
       </main>
 

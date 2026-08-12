@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import ReactDOM from "react-dom";
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ShieldAlert, Sparkles, RefreshCw, CheckCircle, Key } from "lucide-react";
 
 interface GravityShiftPuzzleProps {
   chamberId: number;
   onSolve: (answer: string) => void;
 }
+
+export type { Direction };
 
 type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'RIGHT_DOWN' | 'LEFT_DOWN' | 'RIGHT_UP' | 'LEFT_UP';
 
@@ -268,8 +271,15 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
   const btnActive = "bg-red-600 border-red-400 text-white shadow-lg shadow-red-900/60 scale-105";
   const btnIdle   = "bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600";
 
+  // Portal target for control pad (in the right panel of Level1Screen)
+  const [portalTarget, setPortalTarget] = React.useState<Element | null>(null);
+  useEffect(() => {
+    const el = document.getElementById('level1-control-panel-slot');
+    if (el) setPortalTarget(el);
+  }, []);
+
   return (
-    <div className="relative w-full text-white">
+    <div className="relative w-full h-full text-white flex flex-col">
 
       {/* ─── HEADER ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
@@ -302,14 +312,17 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
         </div>
       )}
 
-      {/* ─── MAIN AREA: puzzle centered, control pad fixed right ─────── */}
-      <div className="relative flex items-start justify-center">
+      {/* ─── MAIN AREA: puzzle grid only (control pad is in the right panel via Level1Screen) ── */}
+      <div className="flex-1 flex items-center justify-center overflow-auto">
 
-        {/* ── PUZZLE GRID — takes up center ── */}
-        <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/90 rounded-2xl border border-zinc-800 shadow-2xl mx-auto">
-          <div className="grid gap-1 p-3 bg-black/80 rounded-xl border border-zinc-800">
+        {/* ── PUZZLE GRID ── */}
+        <div className="flex flex-col items-center justify-center p-4 bg-zinc-950/90 rounded-2xl border border-zinc-800 shadow-2xl">
+          <div
+            className="grid gap-1 p-3 bg-black/80 rounded-xl border border-zinc-800"
+            style={{ gridTemplateColumns: `repeat(${baseMap[0]?.length ?? 13}, minmax(0, 1fr))` }}
+          >
             {baseMap.map((row, rIdx) => (
-              <div key={rIdx} className="flex gap-1">
+              <React.Fragment key={rIdx}>
                 {row.map((baseCell, cIdx) => {
                   const isPlayer = player.r === rIdx && player.c === cIdx;
                   const isExit   = baseCell === 'E';
@@ -322,7 +335,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
                   return (
                     <div
                       key={cIdx}
-                      className={`w-11 h-11 rounded-lg flex items-center justify-center text-lg font-bold transition-all duration-150 border ${
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold transition-all duration-150 border ${
                         isPlayer
                           ? 'bg-red-700 border-red-500 shadow-lg shadow-red-600/70 scale-110 animate-pulse'
                           : isExit
@@ -342,7 +355,7 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
                     </div>
                   );
                 })}
-              </div>
+              </React.Fragment>
             ))}
           </div>
 
@@ -355,51 +368,68 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
           </div>
         </div>
 
-        {/* ── CONTROL PAD — fixed to the right corner ── */}
-        <div className="fixed top-1/2 right-4 -translate-y-1/2 z-50 w-[230px] bg-zinc-950/95 border border-zinc-700 rounded-2xl shadow-2xl p-4 space-y-3 backdrop-blur-sm">
-          <span className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-widest block text-center">
-            🎮 Control Pad
-          </span>
+      </div>
 
+      {/* ─── CONTROL PAD (portaled into right panel slot) ──────────── */}
+      {portalTarget && ReactDOM.createPortal(
+        <div className="space-y-3">
+          {/* Keys + Shifts info */}
+          <div className="flex items-center justify-between text-xs font-mono px-1">
+            <span className="flex items-center gap-1.5 font-bold text-amber-400">
+              <Key className="w-3.5 h-3.5" />
+              Keys: {collectedKeys} / {totalKeys}
+            </span>
+            <span className="text-zinc-400">Shifts: <strong className="text-white">{moveCount}</strong></span>
+          </div>
+
+          {/* D-pad label */}
+          <div className="text-center">
+            <span className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-widest">
+              🎮 Control Pad
+            </span>
+          </div>
+
+          {/* D-pad grid */}
           <div className="grid grid-cols-3 gap-2">
             {/* Row 1 */}
             <button onClick={() => shiftGravity('LEFT_UP')} title="→↘" className={`${btnBase} ${gravityDir === 'LEFT_UP' ? btnActive : btnIdle}`}>
-              <span>↖</span><span className="text-[8px] text-zinc-500">→↘</span>
+              <span>↖</span><span className="text-[8px] text-zinc-500">--/+</span>
             </button>
             <button onClick={() => shiftGravity('UP')} title="W = moves DOWN" className={`${btnBase} ${gravityDir === 'UP' ? btnActive : btnIdle}`}>
               <ArrowDown className="w-4 h-4 text-red-400" />
-              <span className="text-[8px] text-zinc-400">W=↓</span>
+              <span className="text-[8px] text-zinc-400">W/+</span>
             </button>
             <button onClick={() => shiftGravity('RIGHT_UP')} title="→↙" className={`${btnBase} ${gravityDir === 'RIGHT_UP' ? btnActive : btnIdle}`}>
-              <span>↗</span><span className="text-[8px] text-zinc-500">→↙</span>
+              <span>↗</span><span className="text-[8px] text-zinc-500">--/+</span>
             </button>
 
             {/* Row 2 */}
             <button onClick={() => shiftGravity('LEFT')} title="A = moves RIGHT" className={`${btnBase} ${gravityDir === 'LEFT' ? btnActive : btnIdle}`}>
               <ArrowRight className="w-4 h-4 text-blue-400" />
-              <span className="text-[8px] text-zinc-400">A=→</span>
+              <span className="text-[8px] text-zinc-400">A/→</span>
             </button>
             <div className="rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xl shadow-inner">
               👹
             </div>
             <button onClick={() => shiftGravity('RIGHT')} title="D = moves LEFT" className={`${btnBase} ${gravityDir === 'RIGHT' ? btnActive : btnIdle}`}>
               <ArrowLeft className="w-4 h-4 text-emerald-400" />
-              <span className="text-[8px] text-zinc-400">D=←</span>
+              <span className="text-[8px] text-zinc-400">D/--</span>
             </button>
 
             {/* Row 3 */}
             <button onClick={() => shiftGravity('LEFT_DOWN')} title="→↗" className={`${btnBase} ${gravityDir === 'LEFT_DOWN' ? btnActive : btnIdle}`}>
-              <span>↙</span><span className="text-[8px] text-zinc-500">→↗</span>
+              <span>↙</span><span className="text-[8px] text-zinc-500">--/+</span>
             </button>
             <button onClick={() => shiftGravity('DOWN')} title="S = moves UP" className={`${btnBase} ${gravityDir === 'DOWN' ? btnActive : btnIdle}`}>
               <ArrowUp className="w-4 h-4 text-purple-400" />
-              <span className="text-[8px] text-zinc-400">S=↑</span>
+              <span className="text-[8px] text-zinc-400">S/+</span>
             </button>
             <button onClick={() => shiftGravity('RIGHT_DOWN')} title="→↖" className={`${btnBase} ${gravityDir === 'RIGHT_DOWN' ? btnActive : btnIdle}`}>
-              <span>↘</span><span className="text-[8px] text-zinc-500">→↖</span>
+              <span>↘</span><span className="text-[8px] text-zinc-500">--/+</span>
             </button>
           </div>
 
+          {/* Reset */}
           <div className="pt-2 border-t border-zinc-800">
             <button
               onClick={handleReset}
@@ -413,9 +443,9 @@ export const GravityShiftPuzzle: React.FC<GravityShiftPuzzleProps> = ({ chamberI
           <p className="text-[9px] text-zinc-600 text-center font-mono leading-relaxed">
             Keyboard: W A S D<br/>or Arrow Keys
           </p>
-        </div>
-
-      </div>
+        </div>,
+        portalTarget
+      )}
 
       {/* ─── SUCCESS OVERLAY ─────────────────────────────────────────── */}
       {isSolved && (

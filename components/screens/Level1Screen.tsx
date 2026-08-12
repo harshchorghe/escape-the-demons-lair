@@ -176,53 +176,64 @@ export const Level1Screen: React.FC<Level1ScreenProps> = ({ state }) => {
   if (!currentRoom) return null;
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-4 py-6 space-y-5">
-      {/* Top bar: back + timer */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setActiveRoomId(null)}
-          className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
-        >
-          ← Back to Gravity Vaults
-        </button>
-        <div className="flex-1" />
-        <div className={`flex items-center gap-2 text-xs font-mono font-bold px-3 py-1.5 rounded-lg border ${
-          roomTimer <= 10
-            ? 'bg-red-950/80 border-red-600 text-red-400 animate-pulse'
-            : roomTimer <= 25
-            ? 'bg-amber-950/60 border-amber-600/50 text-amber-300'
-            : 'bg-zinc-900 border-zinc-800 text-zinc-300'
-        }`}>
-          <Timer className="w-3.5 h-3.5" />
-          {roomTimer}s
-        </div>
-      </div>
-
-      {/* Timer bar */}
-      <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-1000 ${timerColor}`}
-          style={{ width: `${timerPct}%` }}
+    <div className="w-full flex-1 flex flex-row items-stretch overflow-hidden" style={{ minHeight: 0 }}>
+      {/* ── LEFT: Game Board (70%) ── */}
+      <div className="flex items-center justify-center p-4 overflow-auto" style={{ width: '70%' }}>
+        <GravityShiftPuzzle
+          chamberId={activeRoomId}
+          onSolve={(answer) => handleSubmit(answer)}
         />
       </div>
 
-      {/* Render Gravity Shift Puzzle for the active chamber */}
-      <GravityShiftPuzzle
-        chamberId={activeRoomId}
-        onSolve={(answer) => handleSubmit(answer)}
-      />
-
-      {/* Feedback message */}
-      {feedback.message && (
-        <div className={`flex items-start gap-3 p-3 rounded-xl text-sm font-mono border ${
-          feedback.success
-            ? 'bg-emerald-950/60 border-emerald-600/40 text-emerald-300'
-            : 'bg-red-950/60 border-red-600/40 text-red-300'
-        }`}>
-          {feedback.success ? <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
-          {feedback.message}
+      {/* ── RIGHT: Control Panel (30%) ── */}
+      <div
+        className="flex flex-col gap-4 p-4 border-l border-zinc-800 bg-zinc-950/60"
+        style={{ width: '30%', minWidth: '240px' }}
+      >
+        {/* Progress / Timer bar at the top of the right panel */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setActiveRoomId(null)}
+              className="flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            >
+              ← Back
+            </button>
+            <div className={`flex items-center gap-2 text-xs font-mono font-bold px-3 py-1.5 rounded-lg border ${
+              roomTimer <= 10
+                ? 'bg-red-950/80 border-red-600 text-red-400 animate-pulse'
+                : roomTimer <= 25
+                ? 'bg-amber-950/60 border-amber-600/50 text-amber-300'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-300'
+            }`}>
+              <Timer className="w-3.5 h-3.5" />
+              {roomTimer}s
+            </div>
+          </div>
+          {/* Timer progress bar */}
+          <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${timerColor}`}
+              style={{ width: `${timerPct}%` }}
+            />
+          </div>
         </div>
-      )}
+
+        {/* Feedback message */}
+        {feedback.message && (
+          <div className={`flex items-start gap-3 p-3 rounded-xl text-sm font-mono border ${
+            feedback.success
+              ? 'bg-emerald-950/60 border-emerald-600/40 text-emerald-300'
+              : 'bg-red-950/60 border-red-600/40 text-red-300'
+          }`}>
+            {feedback.success ? <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
+            {feedback.message}
+          </div>
+        )}
+
+        {/* Portal slot — GravityShiftPuzzle portals the control pad here */}
+        <div id="level1-control-panel-slot" className="flex-1 overflow-y-auto" />
+      </div>
     </div>
   );
 };
