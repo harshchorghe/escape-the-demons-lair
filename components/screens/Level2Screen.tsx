@@ -118,6 +118,15 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
   const physicsRef = useRef<Level2PhysicsConfig>(DEFAULT_LEVEL2_PHYSICS);
 
   useEffect(() => {
+    pythonApi.getLevel2Config().then((backendCfg) => {
+      if (backendCfg && typeof backendCfg.targetScore === 'number') {
+        physicsRef.current = {
+          ...physicsRef.current,
+          ...backendCfg,
+        };
+      }
+    });
+
     const unsubscribe = subscribeToLevel2PhysicsConfig((config) => {
       physicsRef.current = config;
     });
@@ -656,9 +665,9 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           handleCrash();
         }
 
-        // Dynamic difficulty/speed boost threshold from Firebase config
+        // Dynamic difficulty/speed boost threshold from Firebase / Backend config
         const speedBoostThreshold = phys.speedBoostThreshold || 15;
-        const targetScore = phys.targetScore || 21;
+        const targetScore = phys.targetScore || 18;
 
         const isSpeedBoosted = scoreRef.current >= speedBoostThreshold;
         const baseSpeed = isSpeedBoosted ? phys.pipeSpeedBoost : phys.pipeSpeed;
@@ -1193,7 +1202,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
           <Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
         </h2>
         <p className="text-sm text-zinc-400 max-w-lg mx-auto">
-          The Exit Portal is locked. Navigate the Phoenix through 21 toxic pillars to escape. 
+          The Exit Portal is locked. Navigate the Phoenix through {physicsRef.current.targetScore || 18} toxic pillars to escape. 
           Make a fist or pinch your fingers in front of the camera to fly!
         </p>
       </div>
@@ -1222,7 +1231,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
             {/* Score HUD overlays */}
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-xl text-white font-mono text-sm shadow">
               <Trophy className="w-4 h-4 text-yellow-400" />
-              <span>Pillars: <strong className="text-yellow-400 font-bold">{score} / {physicsRef.current.targetScore || 21}</strong></span>
+              <span>Pillars: <strong className="text-yellow-400 font-bold">{score} / {physicsRef.current.targetScore || 18}</strong></span>
               {score >= (physicsRef.current.speedBoostThreshold || 15) && (
                 <span className="ml-1 text-[10px] font-bold bg-amber-500/20 border border-amber-500/50 text-amber-400 px-1.5 py-0.5 rounded animate-pulse">
                   ⚡ SPEED BOOST
@@ -1327,7 +1336,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                             NO CURRENT LIVES LEFT!
                           </h3>
                           <p className="text-xs text-zinc-300 font-sans max-w-[280px] mx-auto leading-relaxed">
-                            All 3 attempts failed without clearing 21 obstacles. Your team has been disqualified!
+                            All 3 attempts failed without clearing {physicsRef.current.targetScore || 18} obstacles. Your team has been disqualified!
                           </p>
                           <div className="flex justify-center gap-2 items-center pt-2">
                             {[1, 2, 3].map((i) => (
@@ -1367,7 +1376,7 @@ export const Level2Screen: React.FC<Level2ScreenProps> = ({ state, myRole }) => 
                     <div className="space-y-2">
                       <h3 className="text-2xl font-extrabold text-yellow-400 uppercase tracking-wider">Demonic Cavern</h3>
                       <p className="text-xs text-zinc-300 max-w-[280px] leading-relaxed font-sans">
-                        Fly through <strong className="text-yellow-400">{physicsRef.current.targetScore || 21} toxic pillars</strong> to unlock the portal to Level 3!
+                        Fly through <strong className="text-yellow-400">{physicsRef.current.targetScore || 18} toxic pillars</strong> to unlock the portal to Level 3!
                       </p>
                     </div>
                     <div className="flex flex-col gap-2">

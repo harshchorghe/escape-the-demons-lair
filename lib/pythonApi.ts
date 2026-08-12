@@ -234,6 +234,19 @@ export class PythonApiService {
     return null;
   }
 
+  public async getLevel2Config(): Promise<any> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/level2/config`, { signal: AbortSignal.timeout(500) });
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.trim()) return JSON.parse(text);
+      }
+    } catch {
+      // Fallback
+    }
+    return { targetScore: 18 };
+  }
+
   public async getLevel1Rooms(): Promise<Level1RoomData[]> {
     try {
       const res = await fetch(`${this.baseUrl}/api/puzzles/level1`, { signal: AbortSignal.timeout(500) });

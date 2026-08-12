@@ -23,7 +23,7 @@ export const DEFAULT_LEVEL2_PHYSICS: Level2PhysicsConfig = {
   maxFallSpeed: 7.0,
   pipeGap: 200,
   pipeSpawnInterval: 85,
-  targetScore: 21,
+  targetScore: 18,
   speedBoostThreshold: 15,
   timePenalty: 15,
   maxLives: 3,
