@@ -5,6 +5,7 @@ import { GameGameState, INITIAL_GAME_STATE, gameSync } from "@/lib/gameStore";
 import { HeaderHUD } from "@/components/ui/HeaderHUD";
 import { PythonConfigModal } from "@/components/ui/PythonConfigModal";
 import { LobbyScreen } from "@/components/screens/LobbyScreen";
+import { PasswordScreen } from "@/components/screens/PasswordScreen";
 import { FinalLevelScreen } from "@/components/screens/FinalLevelScreen";
 import { VictoryScreen } from "@/components/screens/VictoryScreen";
 import { DisqualifiedScreen } from "@/components/screens/DisqualifiedScreen";
@@ -16,6 +17,14 @@ export default function Home() {
   const [gameState, setGameState] = useState<GameGameState>(INITIAL_GAME_STATE);
   const [myRole, setMyRole] = useState<'player1' | 'player2'>('player1');
   const [isPythonConfigOpen, setIsPythonConfigOpen] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isAuth = window.sessionStorage.getItem('game_authenticated') === 'true';
+      setIsAuthenticated(isAuth);
+    }
+  }, []);
 
   // Subscribe to real-time game state updates (cross-tab & Firebase)
   useEffect(() => {
@@ -51,6 +60,10 @@ export default function Home() {
       : null;
     router.push((role || myRole) === 'player1' ? '/level1' : '/level2');
   };
+
+  if (!isAuthenticated) {
+    return <PasswordScreen onAuthenticated={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-red-900 selection:text-white font-sans">

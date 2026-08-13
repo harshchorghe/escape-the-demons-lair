@@ -20,6 +20,11 @@ export default function Level3Page() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const isAuth = window.sessionStorage.getItem('game_authenticated') === 'true';
+      if (!isAuth) {
+        router.replace('/');
+        return;
+      }
       const storedRole = window.sessionStorage.getItem('my_role') as 'player1' | 'player2' | null;
       if (storedRole) setMyRole(storedRole);
     }
